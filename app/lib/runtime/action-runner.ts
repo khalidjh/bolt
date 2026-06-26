@@ -34,6 +34,35 @@ export type ActionStateUpdate =
 
 type ActionsMap = MapStore<Record<string, ActionState>>;
 
+/**
+ * Scan a shell command and return the quote character (" or ') that is left open, or null if all
+ * quotes are balanced. Tracks which quote type we're inside so an apostrophe within "..." (or a
+ * double-quote within '...') isn't miscounted, and ignores a quote escaped with a backslash while
+ * outside of single quotes (inside single quotes the shell treats backslash literally).
+ */
+function findUnterminatedQuote(command: string): '"' | "'" | null {
+  let openQuote: '"' | "'" | null = null;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+
+    if (char === '\\' && openQuote !== "'") {
+      i++; // skip the escaped character
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      if (openQuote === null) {
+        openQuote = char;
+      } else if (openQuote === char) {
+        openQuote = null;
+      }
+    }
+  }
+
+  return openQuote;
+}
+
 class ActionCommandError extends Error {
   readonly _output: string;
   readonly _header: string;
@@ -580,6 +609,20 @@ export class ActionRunner {
     warning?: string;
   }> {
     const trimmedCommand = command.trim();
+
+    // Guard against unbalanced quotes. A malformed command with an unclosed " or ' (e.g. a token
+    // the model streamed badly, like `npm install --silent">`) leaves jsh sitting in quote-
+    // continuation mode (the `dquote>` prompt) forever, wedging the terminal and blocking every
+    // later action. Close the dangling quote so the command fails fast and recoverably instead.
+    const unterminatedQuote = findUnterminatedQuote(trimmedCommand);
+
+    if (unterminatedQuote) {
+      return {
+        shouldModify: true,
+        modifiedCommand: trimmedCommand + unterminatedQuote,
+        warning: `Closed an unbalanced ${unterminatedQuote === '"' ? 'double' : 'single'} quote to keep the shell from hanging`,
+      };
+    }
 
     // Make npm installs resilient to WebContainer's transient in-browser npm cache corruption
     // ("EIO: '<pkg>' not found in cache"). Retry once after clearing the cache so a single hiccup

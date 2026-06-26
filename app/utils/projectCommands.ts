@@ -61,6 +61,14 @@ export async function detectProjectCommands(files: FileContent[]): Promise<Proje
         Object.keys(dependencies).some((dep) => dep.includes('shadcn')) ||
         hasFile('components.json');
 
+      // Check if this is an Expo / React Native project. WebContainer has no native iOS/Android
+      // toolchain or emulator, so `expo start` (the default `start` script) can't open a native app
+      // and just fails with "command not found: expo" when the bin isn't on PATH. Force the web
+      // target so it renders in the preview pane instead.
+      const isExpoProject =
+        'expo' in dependencies ||
+        Object.values(scripts).some((script) => typeof script === 'string' && script.includes('expo start'));
+
       // Check for preferred commands in priority order
       const preferredCommands = ['dev', 'start', 'preview'];
       const availableCommand = preferredCommands.find((cmd) => scripts[cmd]);
@@ -78,6 +86,18 @@ export async function detectProjectCommands(files: FileContent[]): Promise<Proje
       }
 
       const setupCommand = makeNonInteractive(baseSetupCommand);
+
+      // Expo: ignore the package.json scripts and run the web target directly through npx so it
+      // works regardless of whether a local `expo` bin is on PATH or the script hardcodes native.
+      if (isExpoProject) {
+        return {
+          type: 'Expo',
+          setupCommand,
+          startCommand: 'npx expo start --web',
+          followupMessage:
+            'Detected an Expo project. Running "npx expo start --web" after installation, since WebContainer can only run the web target (no native iOS/Android emulator).',
+        };
+      }
 
       if (availableCommand) {
         return {
