@@ -34,6 +34,10 @@ services:
       - RUNNING_IN_DOCKER=true
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+      # Pin api.z.ai to working edge IPs. GeoDNS hands this server the 128.14.14.141
+      # edge, which silently drops TLS handshakes; 128.14.69.x edges work reliably.
+      - 'api.z.ai:128.14.69.45'
+      - 'api.z.ai:128.14.69.121'
     volumes:
       # Mount populated .env.local so bindings.sh emits wrangler --binding flags at runtime
       - type: bind

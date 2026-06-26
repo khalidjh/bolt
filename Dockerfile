@@ -57,8 +57,12 @@ ENV WRANGLER_SEND_METRICS=false \
 # Note: API keys should be provided at runtime via docker run -e or docker-compose
 # Example: docker run -e OPENAI_API_KEY=your_key_here ...
 
-# Install curl for healthchecks and copy bindings script
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# Install curl for healthchecks and ca-certificates so the workerd runtime can
+# validate TLS when calling LLM provider APIs (curl's CA dep is only a Recommends,
+# which --no-install-recommends skips — without this, outbound HTTPS fails with
+# "unable to get local issuer certificate").
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+  && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy built files and scripts
