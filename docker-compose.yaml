@@ -7,7 +7,9 @@ services:
       dockerfile: Dockerfile
       target: bolt-ai-production
     ports:
-      - '5173:5173'
+      # Bind to localhost only — Caddy is the sole public entry point (HTTPS).
+      # Docker bypasses UFW, so publishing on 0.0.0.0 would expose 5173 in plaintext.
+      - '127.0.0.1:5173:5173'
     env_file: 
       - '.env'
       - '.env.local'
