@@ -140,10 +140,13 @@ async function fetchRepoContentsZip(repo: string, githubToken?: string) {
   const releaseData = (await releaseResponse.json()) as any;
   const zipballUrl = releaseData.zipball_url;
 
-  // Fetch the zipball
+  // Fetch the zipball WITHOUT the Authorization header. The zipball URL 302-redirects
+  // to codeload.github.com (a different origin); the workerd runtime forwards the Bearer
+  // token across that redirect and codeload rejects it with 403. The archive is public,
+  // so no auth is needed here — only the API calls above need the token for rate limits.
   const zipResponse = await fetch(zipballUrl, {
     headers: {
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+      'User-Agent': 'bolt.diy-app',
     },
   });
 

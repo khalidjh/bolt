@@ -41,7 +41,10 @@ function parseCookies(cookieHeader: string): Record<string, string> {
 
 async function chatAction({ context, request }: ActionFunctionArgs) {
   const streamRecovery = new StreamRecoveryManager({
-    timeout: 45000,
+    // glm-5.2 is a reasoning model: it streams reasoning_content (not surfaced as
+    // AI-SDK stream parts) for 40s+ before the first visible content token, so the
+    // stream looks idle. Use a generous timeout to avoid false "stream timeout" aborts.
+    timeout: 180000,
     maxRetries: 2,
     onTimeout: () => {
       logger.warn('Stream timeout - attempting recovery');
