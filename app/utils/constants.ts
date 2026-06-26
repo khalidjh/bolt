@@ -24,7 +24,7 @@ export const DEFAULT_PROVIDER = llmManager.getDefaultProvider();
 // Single-model lock: this deployment only exposes the self-hosted Z.ai GLM model.
 // The model/provider selector and API-key UI are removed in favour of these fixed values.
 export const LOCKED_PROVIDER_NAME = 'Z.ai';
-export const LOCKED_MODEL = 'glm-5.2';
+export const LOCKED_MODEL = 'glm-4.6';
 
 export const providerBaseUrlEnvKeys: Record<string, { baseUrlKey?: string; apiTokenKey?: string }> = {};
 PROVIDER_LIST.forEach((provider) => {
