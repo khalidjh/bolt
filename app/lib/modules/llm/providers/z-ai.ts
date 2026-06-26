@@ -17,6 +17,13 @@ export default class ZaiProvider extends BaseProvider {
 
   staticModels: ModelInfo[] = [
     {
+      name: 'glm-5.2',
+      label: 'GLM-5.2 (200K)',
+      provider: 'Z.ai',
+      maxTokenAllowed: 200000,
+      maxCompletionTokens: 65536,
+    },
+    {
       name: 'glm-4.6',
       label: 'GLM-4.6 (200K)',
       provider: 'Z.ai',

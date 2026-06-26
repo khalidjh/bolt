@@ -64,6 +64,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 # Copy built files and scripts
 COPY --from=prod-deps /app/build /app/build
 COPY --from=prod-deps /app/node_modules /app/node_modules
+RUN npm install -g wrangler@4.44.0 --ignore-scripts
 COPY --from=prod-deps /app/package.json /app/package.json
 COPY --from=prod-deps /app/bindings.sh /app/bindings.sh
 
