@@ -18,6 +18,11 @@ export default defineConfig((config) => {
     },
     build: {
       target: 'esnext',
+      // Note: intentionally NO custom manualChunks here. Rollup's default fine-grained splitting
+      // respects dynamic-import boundaries (e.g. Shiki loads one ~100KB language grammar on demand,
+      // and the lazy-loaded Workbench keeps xterm/CodeMirror/html2canvas out of the landing-page
+      // graph). Coarse vendor chunks defeat that: a single eager reference drags the whole library
+      // into the initial preload (grouping all Shiki languages ballooned the eager payload to 9MB).
     },
     plugins: [
       nodePolyfills({

@@ -3,10 +3,9 @@
  * Preventing TS checks with files presented in the video for a better presentation.
  */
 import type { JSONValue, Message } from 'ai';
-import React, { type RefCallback, useEffect, useState } from 'react';
+import React, { type RefCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
-import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
 import { PROVIDER_LIST } from '~/utils/constants';
 import { Messages } from './Messages.client';
@@ -33,6 +32,14 @@ import { ChatBox } from './ChatBox';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import LlmErrorAlert from './LLMApiAlert';
+
+// Lazy-load the Workbench (terminal/editor/preview): it pulls in xterm, CodeMirror, Shiki,
+// html2canvas and the WebContainer client — several MB that the landing page never needs until
+// the user actually starts building. Keeping it out of the initial route graph is the single
+// biggest mobile-performance win.
+const Workbench = lazy(() =>
+  import('~/components/workbench/Workbench.client').then((module) => ({ default: module.Workbench })),
+);
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -494,7 +501,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
           </div>
           <ClientOnly>
             {() => (
-              <Workbench chatStarted={chatStarted} isStreaming={isStreaming} setSelectedElement={setSelectedElement} />
+              <Suspense fallback={null}>
+                <Workbench chatStarted={chatStarted} isStreaming={isStreaming} setSelectedElement={setSelectedElement} />
+              </Suspense>
             )}
           </ClientOnly>
         </div>
