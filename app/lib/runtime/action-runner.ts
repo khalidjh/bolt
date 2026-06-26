@@ -581,6 +581,26 @@ export class ActionRunner {
   }> {
     const trimmedCommand = command.trim();
 
+    // Make npm installs resilient to WebContainer's transient in-browser npm cache corruption
+    // ("EIO: '<pkg>' not found in cache"). Retry once after clearing the cache so a single hiccup
+    // doesn't leave node_modules half-installed and break the preview. Only rewrites a command that
+    // *starts* with an install and isn't already carrying a retry/cache-clean (avoids double-wrapping
+    // the auto-generated setup commands, which build in their own retry).
+    if (!trimmedCommand.includes('cache clean')) {
+      const installMatch = trimmedCommand.match(/^(npm\s+(?:install|i|ci)\b[^&|;]*?)(\s*(?:&&|\|\||;)[\s\S]*)?$/);
+
+      if (installMatch) {
+        const installPart = installMatch[1].trim();
+        const rest = installMatch[2] ? ` ${installMatch[2].trim()}` : '';
+
+        return {
+          shouldModify: true,
+          modifiedCommand: `(${installPart} || (npm cache clean --force && ${installPart}))${rest}`,
+          warning: 'Added cache-clean retry to npm install for WebContainer resilience',
+        };
+      }
+    }
+
     // Handle rm commands that might fail due to missing files
     if (trimmedCommand.startsWith('rm ') && !trimmedCommand.includes(' -f')) {
       const rmMatch = trimmedCommand.match(/^rm\s+(.+)$/);

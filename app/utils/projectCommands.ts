@@ -65,8 +65,12 @@ export async function detectProjectCommands(files: FileContent[]): Promise<Proje
       const preferredCommands = ['dev', 'start', 'preview'];
       const availableCommand = preferredCommands.find((cmd) => scripts[cmd]);
 
-      // Build setup command with non-interactive handling
-      let baseSetupCommand = 'npx update-browserslist-db@latest && npm install';
+      // Build setup command with non-interactive handling.
+      // WebContainer's in-browser npm cache occasionally corrupts mid-download and fails with
+      // "EIO: '<pkg>' not found in cache" — a transient error. Retry once after clearing the
+      // cache so a single hiccup doesn't leave node_modules half-installed and break the preview.
+      let baseSetupCommand =
+        'npx update-browserslist-db@latest && (npm install || (npm cache clean --force && npm install))';
 
       // Add shadcn init if it's a shadcn project
       if (isShadcnProject) {

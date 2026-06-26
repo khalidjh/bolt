@@ -77,17 +77,22 @@ export const detectProjectType = async (
     const preferredCommands = ['dev', 'start', 'preview'];
     const availableCommand = preferredCommands.find((cmd) => scripts[cmd]);
 
+    // WebContainer's in-browser npm cache occasionally corrupts mid-download and fails with
+    // "EIO: '<pkg>' not found in cache" — a transient error. Retry once after clearing the cache
+    // so a single hiccup doesn't leave node_modules half-installed and break the preview.
+    const resilientInstall = 'npm install || (npm cache clean --force && npm install)';
+
     if (availableCommand) {
       return {
         type: 'Node.js',
-        setupCommand: `npm install && npm run ${availableCommand}`,
+        setupCommand: `(${resilientInstall}) && npm run ${availableCommand}`,
         followupMessage: `Found "${availableCommand}" script in package.json. Running "npm run ${availableCommand}" after installation.`,
       };
     }
 
     return {
       type: 'Node.js',
-      setupCommand: 'npm install',
+      setupCommand: resilientInstall,
       followupMessage:
         'Would you like me to inspect package.json to determine the available scripts for running this project?',
     };
