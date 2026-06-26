@@ -225,7 +225,7 @@ export const ColorSchemeDialog: React.FC<ColorSchemeDialogProps> = ({ setDesignS
                       />
                     )}
                     {f.key === 'gradient' && (
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-400 via-pink-400 to-indigo-400 opacity-90" />
+                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-accent-400 via-pink-400 to-indigo-400 opacity-90" />
                     )}
                     {f.key === 'shadow' && (
                       <div className="relative">
@@ -278,7 +278,7 @@ export const ColorSchemeDialog: React.FC<ColorSchemeDialogProps> = ({ setDesignS
 
       <DialogRoot open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <Dialog>
-          <div className="py-4 px-4 min-w-[480px] max-w-[90vw] max-h-[85vh] flex flex-col gap-6 overflow-hidden">
+          <div className="py-4 px-4 w-[92vw] sm:min-w-[480px] max-w-[90vw] max-h-[85vh] flex flex-col gap-6 overflow-hidden">
             <div className="">
               <DialogTitle className="text-2xl font-bold text-bolt-elements-textPrimary">
                 Design Palette & Features
