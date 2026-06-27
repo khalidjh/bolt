@@ -335,6 +335,15 @@ export class StreamingMessageParser {
     this.#messages.clear();
   }
 
+  /**
+   * Reset parser state for a single message only, leaving every other in-flight message untouched.
+   * Used when a message must be re-parsed from the start (e.g. after enhancing its content) without
+   * disturbing concurrently-streaming messages.
+   */
+  resetMessage(messageId: string) {
+    this.#messages.delete(messageId);
+  }
+
   #parseActionTag(input: string, actionOpenIndex: number, actionEndIndex: number) {
     const actionTag = input.slice(actionOpenIndex, actionEndIndex + 1);
 

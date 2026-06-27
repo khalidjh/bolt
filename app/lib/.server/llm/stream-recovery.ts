@@ -29,6 +29,10 @@ export class StreamRecoveryManager {
 
   updateActivity() {
     this._lastActivity = Date.now();
+
+    // Progress means the stream is healthy again — refund the retry budget so a single early stall
+    // doesn't permanently consume all retries for the rest of a long stream.
+    this._retryCount = 0;
     this._resetTimeout();
   }
 

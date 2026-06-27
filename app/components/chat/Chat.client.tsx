@@ -369,10 +369,10 @@ export const ChatImpl = memo(
         return undefined;
       }
 
-      const attachments = await Promise.all(
+      const results = await Promise.all(
         files.map(
           (file) =>
-            new Promise<Attachment>((resolve) => {
+            new Promise<Attachment | null>((resolve) => {
               const reader = new FileReader();
 
               reader.onloadend = () => {
@@ -382,12 +382,22 @@ export const ChatImpl = memo(
                   url: reader.result as string,
                 });
               };
+
+              // Without an error handler a failed read leaves the promise pending forever,
+              // hanging Promise.all and the awaiting sendMessage. Skip the bad file instead.
+              reader.onerror = () => {
+                logger.error(`Failed to read file "${file.name}"`, reader.error);
+                toast.error(`Could not read "${file.name}" — skipping it.`);
+                resolve(null);
+              };
               reader.readAsDataURL(file);
             }),
         ),
       );
 
-      return attachments;
+      const attachments = results.filter((attachment): attachment is Attachment => attachment !== null);
+
+      return attachments.length > 0 ? attachments : undefined;
     };
 
     const sendMessage = async (_event: React.UIEvent, messageInput?: string) => {

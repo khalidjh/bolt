@@ -21,9 +21,17 @@ function makeNonInteractive(command: string): string {
   // Common interactive packages and their non-interactive flags
   const interactivePackages = [
     { pattern: /npx\s+([^@\s]+@?[^\s]*)\s+init/g, replacement: 'echo "y" | npx --yes $1 init --defaults --yes' },
-    { pattern: /npx\s+create-([^\s]+)/g, replacement: 'npx --yes create-$1 --template default' },
+
+    /*
+     * Only force `npx --yes` so the package download isn't prompted. Do NOT inject `--template
+     * default`: it isn't a valid flag for most create-* scaffolders (e.g. create-next-app) and
+     * breaks them. Any remaining interactive prompts are backstopped by the shell command timeout.
+     */
+    { pattern: /npx\s+create-([^\s]+)/g, replacement: 'npx --yes create-$1' },
     { pattern: /npx\s+([^@\s]+@?[^\s]*)\s+add/g, replacement: 'npx --yes $1 add --defaults --yes' },
-    { pattern: /npm\s+install(?!\s+--)/g, replacement: 'npm install --yes --no-audit --no-fund --silent' },
+
+    // `(?![\w-])` keeps `npm install-test` / `npm installfoo` from matching the `install` substring.
+    { pattern: /npm\s+install(?![\w-])(?!\s+--)/g, replacement: 'npm install --no-audit --no-fund' },
     { pattern: /yarn\s+add(?!\s+--)/g, replacement: 'yarn add --non-interactive' },
     { pattern: /pnpm\s+add(?!\s+--)/g, replacement: 'pnpm add --yes' },
   ];

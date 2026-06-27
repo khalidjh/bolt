@@ -90,20 +90,35 @@ export const selectStarterTemplate = async (options: { message: string; model: s
     provider,
     system: starterTemplateSelectionPrompt(templates),
   };
-  const response = await fetch('/api/llmcall', {
-    method: 'POST',
-    body: JSON.stringify(requestBody),
-  });
-  const respJson: { text: string } = await response.json();
-  console.log(respJson);
+  try {
+    const response = await fetch('/api/llmcall', {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    });
 
-  const { text } = respJson;
-  const selectedTemplate = parseSelectedTemplate(text);
+    if (!response.ok) {
+      throw new Error(`Template selection request failed: ${response.status} ${response.statusText}`);
+    }
 
-  if (selectedTemplate) {
-    return selectedTemplate;
-  } else {
+    const respJson: { text: string } = await response.json();
+    console.log(respJson);
+
+    const { text } = respJson;
+    const selectedTemplate = parseSelectedTemplate(text);
+
+    if (selectedTemplate) {
+      return selectedTemplate;
+    }
+
     console.log('No template selected, using blank template');
+
+    return {
+      template: 'blank',
+      title: '',
+    };
+  } catch (error) {
+    // A network error / bad response must not wedge the chat — fall back to the blank template.
+    console.error('Error selecting starter template, falling back to blank:', error);
 
     return {
       template: 'blank',

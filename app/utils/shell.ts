@@ -91,6 +91,16 @@ export async function newShellProcess(webcontainer: WebContainer, terminal: ITer
 
 export type ExecutionResult = { output: string; exitCode: number } | undefined;
 
+/**
+ * How long a command may produce NO output before we treat it as hung and interrupt it.
+ * This is an IDLE timeout, not a total-duration cap: the timer resets on every chunk of output,
+ * so a long-but-progressing command (e.g. a large `npm install`) is never killed, while a command
+ * stuck waiting on stdin — interactive prompts not covered by makeNonInteractive, pagers,
+ * credential prompts, `read`, unterminated quotes/heredocs — goes silent and gets interrupted
+ * instead of wedging the whole serialized action queue forever.
+ */
+const COMMAND_IDLE_TIMEOUT_MS = 180_000;
+
 export class BoltShell {
   #initialized: (() => void) | undefined;
   #readyPromise: Promise<void>;
@@ -279,12 +289,44 @@ export class BoltShell {
     // Regex for Expo URL
     const expoUrlRegex = /(exp:\/\/[^\s]+)/;
 
+    /*
+     * Idle watchdog: if the command produces no output for COMMAND_IDLE_TIMEOUT_MS, fire a single
+     * Ctrl-C at the terminal. A hung command is interrupted by jsh, which then emits a fresh
+     * 'prompt' OSC — caught below to break the otherwise-infinite read loop. The timer is re-armed
+     * on every chunk of output so a long-but-progressing command is never killed.
+     */
+    let interrupted = false;
+    let timedOut = false;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const armIdleTimer = () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+      }
+
+      idleTimer = setTimeout(() => {
+        timedOut = true;
+        interrupted = true;
+
+        try {
+          this.#terminal?.input('\x03');
+        } catch {
+          // terminal may already be gone — nothing more we can do
+        }
+      }, COMMAND_IDLE_TIMEOUT_MS);
+    };
+
+    armIdleTimer();
+
     while (true) {
       const { value, done } = await tappedStream.read();
 
       if (done) {
         break;
       }
+
+      // Output arrived — the command is alive, so reset the idle watchdog.
+      armIdleTimer();
 
       const text = value || '';
       fullOutput += text;
@@ -308,12 +350,32 @@ export class BoltShell {
       const [, osc, , , code] = text.match(/\x1b\]654;([^\x07=]+)=?((-?\d+):(\d+))?\x07/) || [];
 
       if (osc === 'exit') {
-        exitCode = parseInt(code, 10);
+        const parsedCode = parseInt(code, 10);
+        exitCode = Number.isNaN(parsedCode) ? 1 : parsedCode;
       }
 
       if (osc === waitCode) {
         break;
       }
+
+      /*
+       * After a forced interrupt jsh emits a 'prompt' OSC rather than 'exit'. Treat that as the end
+       * of the (now-failed) command so we don't loop forever waiting for an 'exit' that will never
+       * come.
+       */
+      if (interrupted && osc === 'prompt') {
+        exitCode = exitCode || 1;
+        break;
+      }
+    }
+
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+    }
+
+    if (timedOut) {
+      fullOutput += `\n[etlaq] Command produced no output for ${COMMAND_IDLE_TIMEOUT_MS / 1000}s and was interrupted.\n`;
+      exitCode = exitCode || 124; // 124 mirrors coreutils `timeout`
     }
 
     return { output: fullOutput, exitCode };

@@ -13,22 +13,37 @@ import { hydrateRoot } from 'react-dom/client';
  */
 function handleStaleChunkError() {
   const KEY = 'vite:preloadError:lastReload';
+  const PARAM = '_staleReload';
   const COOLDOWN_MS = 10_000;
+  const MAX_RELOADS = 3;
 
+  /*
+   * The attempt count rides in the URL so it survives the reload even when sessionStorage is
+   * unavailable (private mode, disabled storage). This is the hard cap that prevents an infinite
+   * reload loop when the failure is NOT a stale deploy.
+   */
+  const url = new URL(window.location.href);
+  const count = Number(url.searchParams.get(PARAM) ?? '0') || 0;
+
+  if (count >= MAX_RELOADS) {
+    return;
+  }
+
+  // Time-based cooldown (best-effort) to avoid two reloads firing back-to-back from one failure.
   try {
     const last = Number(sessionStorage.getItem(KEY) ?? 0);
 
     if (Date.now() - last < COOLDOWN_MS) {
-      // Already reloaded very recently — bail out to avoid a reload loop.
       return;
     }
 
     sessionStorage.setItem(KEY, String(Date.now()));
   } catch {
-    // sessionStorage may be unavailable (private mode, etc.) — reload anyway.
+    // sessionStorage unavailable — the URL-param cap above still bounds the retries.
   }
 
-  window.location.reload();
+  url.searchParams.set(PARAM, String(count + 1));
+  window.location.replace(url.toString());
 }
 
 // Vite dispatches this when a dynamic import / module preload fails to load.
@@ -42,6 +57,7 @@ window.addEventListener('unhandledrejection', (event) => {
   const message = String(event.reason?.message ?? event.reason ?? '');
 
   if (/Failed to fetch dynamically imported module|error loading dynamically imported module/i.test(message)) {
+    event.preventDefault();
     handleStaleChunkError();
   }
 });

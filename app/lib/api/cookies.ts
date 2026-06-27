@@ -24,10 +24,25 @@ export function parseCookies(cookieHeader: string | null) {
 
 export function getApiKeysFromCookie(cookieHeader: string | null): Record<string, string> {
   const cookies = parseCookies(cookieHeader);
-  return cookies.apiKeys ? JSON.parse(cookies.apiKeys) : {};
+  return safeJsonParse(cookies.apiKeys);
 }
 
 export function getProviderSettingsFromCookie(cookieHeader: string | null): Record<string, any> {
   const cookies = parseCookies(cookieHeader);
-  return cookies.providers ? JSON.parse(cookies.providers) : {};
+  return safeJsonParse(cookies.providers);
+}
+
+// A malformed cookie must never crash the route — fall back to an empty object.
+function safeJsonParse<T extends Record<string, any>>(value: string | undefined): T {
+  if (!value) {
+    return {} as T;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    return parsed && typeof parsed === 'object' ? (parsed as T) : ({} as T);
+  } catch {
+    return {} as T;
+  }
 }

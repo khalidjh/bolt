@@ -297,7 +297,10 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
                   return;
                 }
               }
-            })();
+            })().catch((error) => {
+              // The async iterator can reject (transport failure) — never leave this unhandled.
+              logger.error('Continuation stream consumer failed:', error);
+            });
 
             return;
           },
@@ -328,25 +331,31 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
         });
 
         (async () => {
-          for await (const part of result.fullStream) {
-            streamRecovery.updateActivity();
+          try {
+            for await (const part of result.fullStream) {
+              streamRecovery.updateActivity();
 
-            if (part.type === 'error') {
-              const error: any = part.error;
-              logger.error('Streaming error:', error);
-              streamRecovery.stop();
+              if (part.type === 'error') {
+                const error: any = part.error;
+                logger.error('Streaming error:', error);
 
-              // Enhanced error handling for common streaming issues
-              if (error.message?.includes('Invalid JSON response')) {
-                logger.error('Invalid JSON response detected - likely malformed API response');
-              } else if (error.message?.includes('token')) {
-                logger.error('Token-related error detected - possible token limit exceeded');
+                // Enhanced error handling for common streaming issues
+                if (error.message?.includes('Invalid JSON response')) {
+                  logger.error('Invalid JSON response detected - likely malformed API response');
+                } else if (error.message?.includes('token')) {
+                  logger.error('Token-related error detected - possible token limit exceeded');
+                }
+
+                return;
               }
-
-              return;
             }
+          } catch (error) {
+            // A throwing iterator (transport failure) must not become an unhandled rejection.
+            logger.error('Stream consumer failed:', error);
+          } finally {
+            // Always tear down the recovery timer so it can't keep firing after the stream ends.
+            streamRecovery.stop();
           }
-          streamRecovery.stop();
         })();
         result.mergeIntoDataStream(dataStream);
       },

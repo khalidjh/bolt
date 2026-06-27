@@ -41,8 +41,12 @@ export class EnhancedStreamingMessageParser extends StreamingMessageParser {
       const enhancedInput = this._detectAndWrapCodeBlocks(messageId, input);
 
       if (enhancedInput !== input) {
-        // Reset and reparse with enhanced input
-        this.reset();
+        /*
+         * Re-parse ONLY this message from the start with the enhanced input. The global reset()
+         * used here previously wiped parser state (and artifact counters) for every other in-flight
+         * message — re-emitting already-streamed content and colliding artifact ids across messages.
+         */
+        this.resetMessage(messageId);
         output = super.parse(messageId, enhancedInput);
       }
     }

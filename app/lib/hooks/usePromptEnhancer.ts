@@ -33,52 +33,56 @@ export function usePromptEnhancer() {
       requestBody.apiKeys = apiKeys;
     }
 
-    const response = await fetch('/api/enhancer', {
-      method: 'POST',
-      body: JSON.stringify(requestBody),
-    });
-
-    const reader = response.body?.getReader();
-
     const originalInput = input;
+    let _input = '';
 
-    if (reader) {
+    try {
+      const response = await fetch('/api/enhancer', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Prompt enhancement failed: ${response.status} ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+
+      if (!reader) {
+        throw new Error('Prompt enhancer returned an empty response body');
+      }
+
       const decoder = new TextDecoder();
 
-      let _input = '';
-      let _error;
+      // Clear the field only once we know we have a stream to fill it with.
+      setInput('');
 
-      try {
-        setInput('');
+      while (true) {
+        const { value, done } = await reader.read();
 
-        while (true) {
-          const { value, done } = await reader.read();
-
-          if (done) {
-            break;
-          }
-
-          _input += decoder.decode(value);
-
-          logger.trace('Set input', _input);
-
-          setInput(_input);
-        }
-      } catch (error) {
-        _error = error;
-        setInput(originalInput);
-      } finally {
-        if (_error) {
-          logger.error(_error);
+        if (done) {
+          break;
         }
 
-        setEnhancingPrompt(false);
-        setPromptEnhanced(true);
+        _input += decoder.decode(value, { stream: true });
 
-        setTimeout(() => {
-          setInput(_input);
-        });
+        logger.trace('Set input', _input);
+
+        setInput(_input);
       }
+
+      // Flush any remaining bytes from the decoder.
+      _input += decoder.decode();
+      setInput(_input);
+      setPromptEnhanced(true);
+    } catch (error) {
+      logger.error(error);
+
+      // Restore whatever the user originally typed so a failed enhance never eats their prompt.
+      setInput(originalInput);
+    } finally {
+      // Always release the spinner, regardless of how we got here.
+      setEnhancingPrompt(false);
     }
   };
 
