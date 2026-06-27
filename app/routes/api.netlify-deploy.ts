@@ -1,6 +1,7 @@
 import { type ActionFunctionArgs, json } from '@remix-run/cloudflare';
 import crypto from 'crypto';
 import type { NetlifySiteInfo } from '~/types/netlify';
+import { getOperatorToken } from '~/lib/.server/operatorTokens';
 
 interface DeployRequestBody {
   siteId?: string;
@@ -25,9 +26,17 @@ async function readNetlifyError(response: Response) {
   }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   try {
-    const { siteId, files, token, chatId } = (await request.json()) as DeployRequestBody & { token: string };
+    const {
+      siteId,
+      files,
+      token: userToken,
+      chatId,
+    } = (await request.json()) as DeployRequestBody & { token?: string };
+
+    // Precedence: the client's own token (opt-in override) -> the operator's server-side default.
+    const token = userToken || getOperatorToken('netlify', context);
 
     if (!token) {
       return json({ error: 'Not connected to Netlify' }, { status: 401 });

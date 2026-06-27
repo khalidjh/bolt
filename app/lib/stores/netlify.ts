@@ -21,6 +21,37 @@ export const netlifyConnection = atom<NetlifyConnection>(initialConnection);
 export const isConnecting = atom<boolean>(false);
 export const isFetchingStats = atom<boolean>(false);
 
+/**
+ * True when the operator has configured a server-side Netlify token (NETLIFY_AUTH_TOKEN).
+ * In that case clients can deploy to the operator's account without connecting their own,
+ * and the token never reaches the browser.
+ */
+export const netlifyOperatorDefault = atom<boolean>(false);
+
+export async function initializeNetlifyOperatorDefault() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/paas-config');
+
+    if (!response.ok) {
+      return;
+    }
+
+    const config = (await response.json()) as { netlify?: boolean };
+    netlifyOperatorDefault.set(!!config.netlify);
+  } catch (error) {
+    console.error('Failed to load PaaS config for Netlify:', error);
+  }
+}
+
+// Discover the operator default as soon as the store loads in the browser.
+if (typeof window !== 'undefined') {
+  initializeNetlifyOperatorDefault();
+}
+
 // Function to initialize Netlify connection with environment token
 export async function initializeNetlifyConnection() {
   const currentState = netlifyConnection.get();

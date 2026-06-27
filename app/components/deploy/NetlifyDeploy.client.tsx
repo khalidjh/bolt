@@ -1,6 +1,6 @@
 import { toast } from 'react-toastify';
 import { useStore } from '@nanostores/react';
-import { netlifyConnection } from '~/lib/stores/netlify';
+import { netlifyConnection, netlifyOperatorDefault } from '~/lib/stores/netlify';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { webcontainer } from '~/lib/webcontainer';
 import { path } from '~/utils/path';
@@ -12,10 +12,14 @@ import { formatBuildFailureOutput } from './deployUtils';
 export function useNetlifyDeploy() {
   const [isDeploying, setIsDeploying] = useState(false);
   const netlifyConn = useStore(netlifyConnection);
+  const operatorDefault = useStore(netlifyOperatorDefault);
   const currentChatId = useStore(chatId);
 
+  // The client can deploy either with its own connected account or via the operator's server-side default.
+  const canDeploy = !!netlifyConn.token || operatorDefault;
+
   const handleNetlifyDeploy = async () => {
-    if (!netlifyConn.user || !netlifyConn.token) {
+    if (!canDeploy) {
       toast.error('Please connect to Netlify first in the settings tab!');
       return false;
     }
@@ -150,7 +154,9 @@ export function useNetlifyDeploy() {
         body: JSON.stringify({
           siteId: existingSiteId || undefined,
           files: fileContents,
-          token: netlifyConn.token,
+          // Only send a token when the user connected their own account; otherwise the
+          // server falls back to the operator's default token (which never reaches the browser).
+          token: netlifyConn.token || undefined,
           chatId: currentChatId,
         }),
       });
@@ -168,52 +174,16 @@ export function useNetlifyDeploy() {
         throw new Error(data.error || 'Invalid deployment response');
       }
 
-      const maxAttempts = 20; // 2 minutes timeout
-      let attempts = 0;
-      let deploymentStatus;
-
-      while (attempts < maxAttempts) {
-        try {
-          const statusResponse = await fetch(
-            `https://api.netlify.com/api/v1/sites/${data.site.id}/deploys/${data.deploy.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${netlifyConn.token}`,
-              },
-            },
-          );
-
-          deploymentStatus = (await statusResponse.json()) as any;
-
-          if (deploymentStatus.state === 'ready' || deploymentStatus.state === 'uploaded') {
-            break;
-          }
-
-          if (deploymentStatus.state === 'error') {
-            // Notify that deployment failed
-            deployArtifact.runner.handleDeployAction('deploying', 'failed', {
-              error: 'Deployment failed: ' + (deploymentStatus.error_message || 'Unknown error'),
-              source: 'netlify',
-            });
-            throw new Error('Deployment failed: ' + (deploymentStatus.error_message || 'Unknown error'));
-          }
-
-          attempts++;
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        } catch (error) {
-          console.error('Status check error:', error);
-          attempts++;
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        }
-      }
-
-      if (attempts >= maxAttempts) {
-        // Notify that deployment timed out
+      /*
+       * The server route already polls Netlify until the deploy reaches the `ready` state and
+       * returns the final URL, so no browser-side polling (which would need a token) is required.
+       */
+      if (!data.deploy.url) {
         deployArtifact.runner.handleDeployAction('deploying', 'failed', {
-          error: 'Deployment timed out',
+          error: 'Deployment did not return a URL',
           source: 'netlify',
         });
-        throw new Error('Deployment timed out');
+        throw new Error('Deployment did not return a URL');
       }
 
       // Store the site ID if it's a new site
@@ -223,7 +193,7 @@ export function useNetlifyDeploy() {
 
       // Notify that deployment completed successfully
       deployArtifact.runner.handleDeployAction('complete', 'complete', {
-        url: deploymentStatus.ssl_url || deploymentStatus.url,
+        url: data.deploy.url,
         source: 'netlify',
       });
 
@@ -244,6 +214,6 @@ export function useNetlifyDeploy() {
   return {
     isDeploying,
     handleNetlifyDeploy,
-    isConnected: !!netlifyConn.user,
+    isConnected: !!netlifyConn.user || operatorDefault,
   };
 }

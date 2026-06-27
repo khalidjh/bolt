@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { classNames } from '~/utils/classNames';
 import { useStore } from '@nanostores/react';
-import { netlifyConnection, updateNetlifyConnection, initializeNetlifyConnection } from '~/lib/stores/netlify';
+import {
+  netlifyConnection,
+  netlifyOperatorDefault,
+  updateNetlifyConnection,
+  initializeNetlifyConnection,
+} from '~/lib/stores/netlify';
 import type { NetlifySite, NetlifyDeploy, NetlifyBuild, NetlifyUser } from '~/types/netlify';
 import {
   CloudIcon,
@@ -47,6 +52,7 @@ export default function NetlifyConnection() {
   console.log('NetlifyConnection component mounted');
 
   const connection = useStore(netlifyConnection);
+  const operatorDefault = useStore(netlifyOperatorDefault);
   const [tokenInput, setTokenInput] = useState('');
   const [fetchingStats, setFetchingStats] = useState(false);
   const [sites, setSites] = useState<NetlifySite[]>([]);
@@ -891,8 +897,18 @@ export default function NetlifyConnection() {
 
         {!connection.user ? (
           <div className="mt-4">
+            {operatorDefault && (
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-bolt-elements-borderColor bg-bolt-elements-background-depth-2 p-3">
+                <div className="i-ph:check-circle-fill text-accent-500 w-5 h-5 shrink-0 mt-0.5" />
+                <div className="text-sm text-bolt-elements-textSecondary">
+                  <span className="font-medium text-bolt-elements-textPrimary">Hosted on Etlaq.</span> Your projects
+                  deploy to Netlify automatically — no setup required. Connect your own Netlify account below only if you
+                  want deployments to go to your account instead.
+                </div>
+              </div>
+            )}
             <label className="block text-sm text-bolt-elements-textSecondary dark:text-bolt-elements-textSecondary mb-2">
-              API Token
+              {operatorDefault ? 'Use your own Netlify account (optional)' : 'API Token'}
             </label>
             <input
               type="password"
@@ -918,12 +934,6 @@ export default function NetlifyConnection() {
                 Get your token
                 <div className="i-ph:arrow-square-out w-4 h-4" />
               </a>
-            </div>
-            {/* Debug info - remove this later */}
-            <div className="mt-2 text-xs text-gray-500">
-              <p>Debug: Token present: {connection.token ? '✅' : '❌'}</p>
-              <p>Debug: User present: {connection.user ? '✅' : '❌'}</p>
-              <p>Debug: Env token: {import.meta.env?.VITE_NETLIFY_ACCESS_TOKEN ? '✅' : '❌'}</p>
             </div>
             <div className="flex gap-2 mt-4">
               <button

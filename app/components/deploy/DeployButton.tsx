@@ -1,6 +1,6 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useStore } from '@nanostores/react';
-import { netlifyConnection } from '~/lib/stores/netlify';
+import { netlifyConnection, netlifyOperatorDefault } from '~/lib/stores/netlify';
 import { vercelConnection } from '~/lib/stores/vercel';
 import { isGitLabConnected } from '~/lib/stores/gitlabConnection';
 import { workbenchStore } from '~/lib/stores/workbench';
@@ -30,6 +30,8 @@ export const DeployButton = ({
   onGitLabDeploy,
 }: DeployButtonProps) => {
   const netlifyConn = useStore(netlifyConnection);
+  const netlifyOperatorAvailable = useStore(netlifyOperatorDefault);
+  const netlifyAvailable = !!netlifyConn.user || netlifyOperatorAvailable;
   const vercelConn = useStore(vercelConnection);
   const gitlabIsConnected = useStore(isGitLabConnected);
   const [activePreviewIndex] = useState(0);
@@ -152,10 +154,10 @@ export const DeployButton = ({
               className={classNames(
                 'cursor-pointer flex items-center w-full px-4 py-2 text-sm text-bolt-elements-textPrimary hover:bg-bolt-elements-item-backgroundActive gap-2 rounded-md group relative',
                 {
-                  'opacity-60 cursor-not-allowed': isDeploying || !activePreview || !netlifyConn.user,
+                  'opacity-60 cursor-not-allowed': isDeploying || !activePreview || !netlifyAvailable,
                 },
               )}
-              disabled={isDeploying || !activePreview || !netlifyConn.user}
+              disabled={isDeploying || !activePreview || !netlifyAvailable}
               onClick={handleNetlifyDeployClick}
             >
               <img
@@ -166,7 +168,11 @@ export const DeployButton = ({
                 src="https://cdn.simpleicons.org/netlify"
               />
               <span className="mx-auto">
-                {!netlifyConn.user ? 'No Netlify Account Connected' : 'Deploy to Netlify'}
+                {!netlifyAvailable
+                  ? 'No Netlify Account Connected'
+                  : netlifyConn.user
+                    ? 'Deploy to Netlify'
+                    : 'Deploy to Netlify (Etlaq hosting)'}
               </span>
               {netlifyConn.user && <NetlifyDeploymentLink />}
             </DropdownMenu.Item>
