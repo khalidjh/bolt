@@ -35,6 +35,54 @@
   }
 }
 
+/* Thinking indicator: gently spinning + breathing Etlaq star mark. */
+.etlaq-mark-thinking {
+  animation: etlaqMarkSpin 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  transform-origin: center;
+}
+
+@keyframes etlaqMarkSpin {
+  0% {
+    transform: rotate(0deg) scale(0.9);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(360deg) scale(0.9);
+    opacity: 0.7;
+  }
+}
+
+/* Thinking indicator: shimmer sweep across the status word. */
+.thinking-shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--bolt-elements-item-contentAccent, #3066f5) 30%,
+    rgba(255, 255, 255, 0.95) 50%,
+    var(--bolt-elements-item-contentAccent, #3066f5) 70%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinkingShimmer 2.2s linear infinite;
+}
+
+@keyframes thinkingShimmer {
+  0% {
+    background-position: 180% 0;
+  }
+
+  100% {
+    background-position: -80% 0;
+  }
+}
+
 .dropdown-animation {
   opacity: 0;
   animation: fadeMoveDown 0.15s forwards;

@@ -63,6 +63,19 @@ interface ChatBoxProps {
 export const ChatBox: React.FC<ChatBoxProps> = (props) => {
   const [toolsOpen, setToolsOpen] = React.useState(false);
 
+  // Each tray row wraps a small trigger button plus a text label. Clicking anywhere on the row
+  // (the label, the padding) should activate the row's button — not just the icon itself.
+  // If the click already landed on the button, let it handle itself to avoid a double toggle.
+  const handleRowClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as Element | null;
+
+    if (!target?.closest('button')) {
+      event.currentTarget.querySelector('button')?.click();
+    }
+
+    setToolsOpen(false);
+  };
+
   return (
     <div
       className={classNames(
@@ -207,7 +220,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
             <IconButton
               title="Tools"
               className={classNames(
-                'transition-all',
+                'transition-all !rounded-full border border-bolt-elements-borderColor',
                 toolsOpen ? '!bg-bolt-elements-item-backgroundAccent !text-bolt-elements-item-contentAccent' : '',
               )}
               onClick={() => setToolsOpen((v) => !v)}
@@ -229,7 +242,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
             >
               <div
                 className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                onClick={() => setToolsOpen(false)}
+                onClick={handleRowClick}
               >
                 <ColorSchemeDialog designScheme={props.designScheme} setDesignScheme={props.setDesignScheme} />
                 <span className="text-sm text-bolt-elements-textSecondary">Design palette</span>
@@ -237,7 +250,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
 
               <div
                 className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                onClick={() => setToolsOpen(false)}
+                onClick={handleRowClick}
               >
                 <IconButton title="Upload file" className="transition-all" onClick={() => props.handleFileUpload()}>
                   <div className="i-ph:paperclip text-xl" />
@@ -247,7 +260,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
 
               <div
                 className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                onClick={() => setToolsOpen(false)}
+                onClick={handleRowClick}
               >
                 <WebSearch onSearchResult={(result) => props.onWebSearchResult?.(result)} disabled={props.isStreaming} />
                 <span className="text-sm text-bolt-elements-textSecondary">Web search</span>
@@ -255,7 +268,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
 
               <div
                 className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                onClick={() => setToolsOpen(false)}
+                onClick={handleRowClick}
               >
                 <IconButton
                   title="Enhance prompt"
@@ -277,29 +290,24 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
 
               <div
                 className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                onClick={() => setToolsOpen(false)}
-              >
-                <SpeechRecognitionButton
-                  isListening={props.isListening}
-                  onStart={props.startListening}
-                  onStop={props.stopListening}
-                  disabled={props.isStreaming}
-                />
-                <span className="text-sm text-bolt-elements-textSecondary">Voice input</span>
-              </div>
-
-              <div
-                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                onClick={() => setToolsOpen(false)}
+                onClick={handleRowClick}
               >
                 <McpTools />
                 <span className="text-sm text-bolt-elements-textSecondary">MCP tools</span>
               </div>
 
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={handleRowClick}
+              >
+                <SupabaseConnection />
+                <span className="text-sm text-bolt-elements-textSecondary">Supabase</span>
+              </div>
+
               {props.chatStarted && (
                 <div
                   className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
-                  onClick={() => setToolsOpen(false)}
+                  onClick={handleRowClick}
                 >
                   <IconButton
                     title="Discuss"
@@ -328,7 +336,12 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
               <kbd className="kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2">Return</kbd> a new line
             </div>
           ) : null}
-          <SupabaseConnection />
+          <SpeechRecognitionButton
+            isListening={props.isListening}
+            onStart={props.startListening}
+            onStop={props.stopListening}
+            disabled={props.isStreaming}
+          />
           <ExpoQrModal open={props.qrModalOpen} onClose={() => props.setQrModalOpen(false)} />
         </div>
       </div>

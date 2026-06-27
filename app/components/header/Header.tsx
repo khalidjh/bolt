@@ -4,10 +4,11 @@ import { chatStore } from '~/lib/stores/chat';
 import { classNames } from '~/utils/classNames';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
-import { toggleSidebar } from '~/lib/stores/sidebar';
+import { sidebarOpenStore, toggleSidebar } from '~/lib/stores/sidebar';
 
 export function Header() {
   const chat = useStore(chatStore);
+  const sidebarOpen = useStore(sidebarOpenStore);
 
   return (
     <header
@@ -19,12 +20,19 @@ export function Header() {
       <div className="flex items-center gap-2 z-logo text-bolt-elements-textPrimary">
         <button
           data-sidebar-toggle
-          className="i-ph:sidebar-simple-duotone text-xl text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors cursor-pointer"
+          className={classNames(
+            'flex items-center justify-center w-9 h-9 rounded-full shrink-0 cursor-pointer transition-colors',
+            'border border-bolt-elements-borderColor bg-bolt-elements-background-depth-1',
+            'text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-2',
+          )}
           aria-label="Toggle sidebar"
           onClick={() => toggleSidebar()}
-        />
-        {/* Hide the logo/name once a chat starts so the centered chat title has room. */}
-        {!chat.started && (
+        >
+          <span className="i-ph:sidebar-simple-duotone text-lg" />
+        </button>
+        {/* Hide the logo/name once a chat starts so the centered chat title has room, and
+            when the sidebar is open so it doesn't overlap the sidebar's own logo (z-logo > z-sidebar). */}
+        {!chat.started && !sidebarOpen && (
           <a href="/" className="text-2xl font-semibold text-accent flex items-center" aria-label="Etlaq home">
             <img src="/logo-etlaq-light.svg" alt="Etlaq" className="w-[104px] inline-block dark:hidden" />
             <img src="/logo-etlaq-dark.svg" alt="Etlaq" className="w-[104px] inline-block hidden dark:block" />
@@ -34,7 +42,13 @@ export function Header() {
       {chat.started && ( // Display ChatDescription and HeaderActionButtons only when the chat has started.
         <>
           <div className="flex-1 flex justify-center min-w-0 px-2">
-            <span className="inline-flex items-center max-w-full truncate px-3 py-1 rounded-full text-sm font-medium text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-2 transition-colors">
+            <span
+              className={classNames(
+                'inline-flex items-center max-w-full truncate px-4 py-1.5 rounded-full text-sm font-medium',
+                'border border-bolt-elements-borderColor bg-bolt-elements-background-depth-1 shadow-sm',
+                'text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-2 transition-colors',
+              )}
+            >
               <ClientOnly>{() => <ChatDescription />}</ClientOnly>
             </span>
           </div>

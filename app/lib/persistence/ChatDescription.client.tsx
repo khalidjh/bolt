@@ -51,7 +51,7 @@ export function ChatDescription() {
             <WithTooltip tooltip="Rename chat">
               <button
                 type="button"
-                className="ml-2 i-ph:pencil-fill scale-110 hover:text-bolt-elements-item-contentAccent"
+                className="ml-2 i-ph:pencil-simple text-bolt-elements-textSecondary hover:text-bolt-elements-item-contentAccent transition-colors"
                 onClick={(event) => {
                   event.preventDefault();
                   toggleEditMode();

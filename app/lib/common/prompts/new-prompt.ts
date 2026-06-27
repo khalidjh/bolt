@@ -198,6 +198,18 @@ The year is 2025.
       Do not add @layer base { * { @apply border-border } } or bg-background/text-foreground.
     - If you DO want the shadcn token system, scaffold it completely in the SAME response: the CSS
       variables, the tailwind.config color mappings, and tailwindcss-animate — never half of it.
+
+  Vanilla HTML/CSS/JS - CRITICAL (page renders UNSTYLED otherwise):
+    - When the user asks for plain "HTML, CSS and JS" (no framework), the stylesheet MUST actually be
+      loaded by the page. A CSS file that is created but never referenced is the #1 failure — it makes
+      the app render with raw browser defaults (Times-serif text, unstyled buttons, no layout).
+    - In a Vanilla Vite template the entry is index.html → /src/main.js (or main.ts). Either link the
+      CSS directly in index.html with <link rel="stylesheet" href="/src/style.css"> AND that exact path
+      must exist, OR import it from the JS entry with an import './style.css' statement. Do BOTH if unsure.
+    - Do not leave the game/app markup only inside index.html while the CSS lives in an unreferenced
+      file. After writing the files, mentally verify: does the served index.html pull in the stylesheet?
+    - Even without Tailwind, the design standards below still fully apply: write real CSS (layout grid,
+      spacing, colors, hover/active states) so the result looks production-grade, never default-HTML.
 </artifact_instructions>
 
 <design_instructions>

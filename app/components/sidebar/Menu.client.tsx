@@ -53,28 +53,6 @@ type DialogContent =
   | { type: 'bulkDelete'; items: ChatHistoryItem[] }
   | null;
 
-function CurrentDateTime() {
-  const [dateTime, setDateTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setDateTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800/50">
-      <div className="h-4 w-4 i-ph:clock opacity-80" />
-      <div className="flex gap-2">
-        <span>{dateTime.toLocaleDateString()}</span>
-        <span>{dateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-    </div>
-  );
-}
-
 export const Menu = () => {
   const { duplicateCurrentChat, exportChat, importChat } = useChatHistory();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -364,15 +342,15 @@ export const Menu = () => {
           isSettingsOpen ? 'z-40' : 'z-sidebar',
         )}
       >
-        <div className="h-12 flex items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50 rounded-tr-2xl">
-          {/* Offset right so the logo clears the header's sidebar-toggle icon, which floats above the
-              open sidebar (z-logo > z-sidebar) at the top-left corner. */}
-          <a href="/" className="flex items-center ml-8" aria-label="Etlaq home">
+        {/* pb-[2px] nudges the items-center row up ~1px so it lines up with the header's floating toggle icon. */}
+        <div className="h-[var(--header-height)] flex items-center justify-between px-4 pb-[2px] border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50 rounded-tr-2xl">
+          {/* Offset right so the logo clears the header's circular sidebar-toggle button, which floats
+              above the open sidebar (z-logo > z-sidebar) at the top-left corner. */}
+          <a href="/" className="flex items-center ml-11" aria-label="Etlaq home">
             <img src="/logo-etlaq-light.svg" alt="Etlaq" className="w-[88px] inline-block dark:hidden" />
             <img src="/logo-etlaq-dark.svg" alt="Etlaq" className="w-[88px] inline-block hidden dark:block" />
           </a>
           <div className="flex items-center gap-3">
-            <HelpButton onClick={() => window.open('https://stackblitz-labs.github.io/bolt.diy/', '_blank')} />
             <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
               {profile?.username || 'Guest User'}
             </span>
@@ -391,7 +369,6 @@ export const Menu = () => {
             </div>
           </div>
         </div>
-        <CurrentDateTime />
         <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
           <div className="p-4 space-y-3">
             <div className="flex gap-2">
@@ -437,7 +414,7 @@ export const Menu = () => {
               them here on smaller screens. Only shown once a preview exists (i.e. a project is running). */}
           {hasPreview && (
             <div className="lg:hidden px-4 pb-3 flex flex-col items-stretch gap-2 border-b border-gray-200 dark:border-gray-800 mb-1">
-              <DeployButton />
+              <DeployButton className="w-full" />
               <div className="flex gap-2">
                 <button
                   onClick={() =>
@@ -602,6 +579,7 @@ export const Menu = () => {
           <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 px-4 py-3">
             <div className="flex items-center gap-3">
               <SettingsButton onClick={handleSettingsClick} />
+              <HelpButton onClick={() => window.open('https://stackblitz-labs.github.io/bolt.diy/', '_blank')} />
             </div>
             <ThemeSwitch />
           </div>

@@ -38,9 +38,9 @@ export function HeaderActionButtons({ chatStarted }: HeaderActionButtonsProps) {
             }
           }}
           className={classNames(
-            'flex lg:hidden items-center justify-center gap-1.5 mr-1 px-3 py-1.5 rounded-md text-xs transition-colors',
-            'border border-bolt-elements-borderColor bg-bolt-elements-background-depth-2',
-            'text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary',
+            'flex lg:hidden items-center justify-center gap-1.5 mr-1 px-3.5 py-1.5 rounded-full text-xs transition-colors',
+            'border border-bolt-elements-borderColor bg-bolt-elements-background-depth-1',
+            'text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-2',
           )}
           title={showWorkbench ? 'Show chat' : 'Show code'}
         >
