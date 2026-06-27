@@ -185,6 +185,19 @@ The year is 2025.
     - Update package.json with ALL dependencies upfront
     - Run single install command
     - Avoid individual package installations
+
+  Tailwind CSS - CRITICAL (build will FAIL otherwise):
+    - NEVER use shadcn/ui design-token utilities (e.g. border-border, bg-background, text-foreground,
+      text-muted-foreground, bg-card, ring-ring, bg-primary) or "@apply border-border" unless you
+      ALSO fully wire them up: define each token under theme.extend.colors in tailwind.config as
+      hsl(var(--token)) AND declare every matching CSS variable in :root (and .dark) in the global
+      stylesheet. A class like border-border that has no theme color fails with
+      "The \`border-border\` class does not exist".
+    - For a plain Tailwind project (no shadcn configured), keep the global CSS to the three @tailwind
+      directives and style with concrete built-in utilities (border-gray-200, bg-white, text-gray-900).
+      Do not add @layer base { * { @apply border-border } } or bg-background/text-foreground.
+    - If you DO want the shadcn token system, scaffold it completely in the SAME response: the CSS
+      variables, the tailwind.config color mappings, and tailwindcss-animate — never half of it.
 </artifact_instructions>
 
 <design_instructions>
