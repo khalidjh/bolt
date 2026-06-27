@@ -20,7 +20,7 @@ export function ImportButtons({ importChat }: ImportButtonsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex flex-col items-center justify-center w-auto">
+    <div className="flex flex-col items-center justify-center w-full sm:w-auto">
       <input
         ref={fileInputRef}
         type="file"
@@ -66,8 +66,10 @@ export function ImportButtons({ importChat }: ImportButtonsProps) {
           }
         }}
       />
-      <div className="flex flex-col items-center gap-4 max-w-2xl text-center">
-        <div className="flex gap-2">
+      <div className="flex flex-col items-center gap-4 w-full sm:w-auto max-w-2xl text-center">
+        {/* Stack full-width below `sm` (mobile sidebar) so the buttons don't overflow the narrow
+            sidebar; side-by-side at `sm`+ (landing page). */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
             onClick={() => {
               fileInputRef.current?.click();
@@ -79,7 +81,7 @@ export function ImportButtons({ importChat }: ImportButtonsProps) {
               'text-bolt-elements-textPrimary',
               'hover:bg-bolt-elements-background-depth-2',
               'border border-bolt-elements-borderColor',
-              'h-10 px-4 py-2 min-w-[120px] justify-center',
+              'h-10 px-4 py-2 w-full sm:w-auto sm:min-w-[120px] justify-center',
               'transition-all duration-200 ease-in-out',
             )}
           >
@@ -93,7 +95,7 @@ export function ImportButtons({ importChat }: ImportButtonsProps) {
               'text-bolt-elements-textPrimary',
               'hover:bg-bolt-elements-background-depth-2',
               'border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]',
-              'h-10 px-4 py-2 min-w-[120px] justify-center',
+              'h-10 px-4 py-2 w-full sm:w-auto sm:min-w-[120px] justify-center',
               'transition-all duration-200 ease-in-out rounded-lg',
             )}
           />
