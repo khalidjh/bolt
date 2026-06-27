@@ -37,9 +37,39 @@ import LlmErrorAlert from './LLMApiAlert';
 // html2canvas and the WebContainer client — several MB that the landing page never needs until
 // the user actually starts building. Keeping it out of the initial route graph is the single
 // biggest mobile-performance win.
-const Workbench = lazy(() =>
-  import('~/components/workbench/Workbench.client').then((module) => ({ default: module.Workbench })),
-);
+const importWorkbench = () =>
+  import('~/components/workbench/Workbench.client').then((module) => ({ default: module.Workbench }));
+
+/*
+ * Retry a dynamic import a few times before giving up. The Workbench chunk is fetched right when
+ * code starts streaming, and `wrangler pages dev` intermittently mis-routes an asset request that
+ * lands while /api/chat is streaming, returning a spurious 404. A short retry rides over that
+ * window so the lazy import resolves instead of throwing — which previously bubbled up and forced a
+ * full page reload (mid-stream), wiping the in-progress generation.
+ */
+function lazyWithRetry<T extends { default: React.ComponentType<any> }>(
+  factory: () => Promise<T>,
+  retries = 4,
+  baseDelay = 350,
+) {
+  return lazy(
+    () =>
+      new Promise<T>((resolve, reject) => {
+        const attempt = (remaining: number) => {
+          factory().then(resolve, (err) => {
+            if (remaining <= 0) {
+              reject(err);
+            } else {
+              setTimeout(() => attempt(remaining - 1), baseDelay * (retries - remaining + 1));
+            }
+          });
+        };
+        attempt(retries);
+      }),
+  );
+}
+
+const Workbench = lazyWithRetry(importWorkbench);
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -159,6 +189,30 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         setQrModalOpen(true);
       }
     }, [expoUrl]);
+
+    /*
+     * Warm the Workbench chunk while the page is idle — before any chat stream is active — so it's
+     * already cached by the time code starts streaming. This avoids fetching it mid-stream, where
+     * `wrangler pages dev` can spuriously 404 the request and trigger a disruptive reload.
+     */
+    useEffect(() => {
+      const warm = () => {
+        importWorkbench().catch(() => {
+          // background prefetch — failures are retried by lazyWithRetry when actually rendered
+        });
+      };
+
+      const ric = (window as any).requestIdleCallback as undefined | ((cb: () => void, opts?: any) => number);
+
+      if (ric) {
+        const id = ric(warm, { timeout: 4000 });
+        return () => (window as any).cancelIdleCallback?.(id);
+      }
+
+      const t = setTimeout(warm, 1500);
+
+      return () => clearTimeout(t);
+    }, []);
 
     useEffect(() => {
       if (data) {

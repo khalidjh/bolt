@@ -12,38 +12,57 @@ import { hydrateRoot } from 'react-dom/client';
  * if the failure is caused by something other than a stale deploy.
  */
 function handleStaleChunkError() {
-  const KEY = 'vite:preloadError:lastReload';
+  const COUNT_KEY = 'etlaq:staleReload:count';
+  const TS_KEY = 'etlaq:staleReload:lastTs';
   const PARAM = '_staleReload';
   const COOLDOWN_MS = 10_000;
-  const MAX_RELOADS = 3;
+  const MAX_RELOADS = 2;
 
   /*
-   * The attempt count rides in the URL so it survives the reload even when sessionStorage is
-   * unavailable (private mode, disabled storage). This is the hard cap that prevents an infinite
-   * reload loop when the failure is NOT a stale deploy.
+   * Count attempts in sessionStorage so the cap survives the app's own client-side navigation
+   * (e.g. landing -> /chat/:id), which would otherwise strip a URL-param counter and let the loop
+   * run forever. The URL param is only a fallback for when storage is unavailable (private mode).
    */
+  let storageOk = true;
+  let count = 0;
+  let last = 0;
+
+  try {
+    count = Number(sessionStorage.getItem(COUNT_KEY) ?? '0') || 0;
+    last = Number(sessionStorage.getItem(TS_KEY) ?? '0') || 0;
+  } catch {
+    storageOk = false;
+  }
+
   const url = new URL(window.location.href);
-  const count = Number(url.searchParams.get(PARAM) ?? '0') || 0;
+
+  if (!storageOk) {
+    count = Number(url.searchParams.get(PARAM) ?? '0') || 0;
+  }
 
   if (count >= MAX_RELOADS) {
+    // Persistent failure — stop reloading so we don't wipe the page (and any in-progress work) in a loop.
     return;
   }
 
-  // Time-based cooldown (best-effort) to avoid two reloads firing back-to-back from one failure.
-  try {
-    const last = Number(sessionStorage.getItem(KEY) ?? 0);
-
-    if (Date.now() - last < COOLDOWN_MS) {
-      return;
-    }
-
-    sessionStorage.setItem(KEY, String(Date.now()));
-  } catch {
-    // sessionStorage unavailable — the URL-param cap above still bounds the retries.
+  if (storageOk && last && Date.now() - last < COOLDOWN_MS) {
+    // Don't fire twice from a single burst of failures.
+    return;
   }
 
-  url.searchParams.set(PARAM, String(count + 1));
-  window.location.replace(url.toString());
+  if (storageOk) {
+    try {
+      sessionStorage.setItem(COUNT_KEY, String(count + 1));
+      sessionStorage.setItem(TS_KEY, String(Date.now()));
+    } catch {
+      // ignore
+    }
+
+    window.location.reload();
+  } else {
+    url.searchParams.set(PARAM, String(count + 1));
+    window.location.replace(url.toString());
+  }
 }
 
 // Vite dispatches this when a dynamic import / module preload fails to load.
