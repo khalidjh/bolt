@@ -30,6 +30,13 @@ export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
     const { id, isStreaming = false, messages = [] } = props;
     const location = useLocation();
 
+    // Only show the "thinking" loader while we're waiting for the assistant to start
+    // responding. Once it begins generating code/text, the message (and its code panel)
+    // already convey progress, so the rotating-words loader is redundant.
+    const lastMessage = messages[messages.length - 1];
+    const isWaitingForResponse =
+      isStreaming && (!lastMessage || lastMessage.role === 'user' || !lastMessage.content?.trim());
+
     const handleRewind = (messageId: string) => {
       const searchParams = new URLSearchParams(location.search);
       searchParams.set('rewindTo', messageId);
@@ -94,7 +101,7 @@ export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
               );
             })
           : null}
-        {isStreaming && <ThinkingIndicator className="w-full justify-center" />}
+        {isWaitingForResponse && <ThinkingIndicator className="w-full justify-center" />}
       </div>
     );
   },
