@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { lazy, Suspense, useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '~/components/ui/Button';
 import { ConfirmationDialog, SelectionDialog } from '~/components/ui/Dialog';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '~/components/ui/Card';
@@ -6,7 +6,11 @@ import { motion } from 'framer-motion';
 import { useDataOperations } from '~/lib/hooks/useDataOperations';
 import { openDatabase } from '~/lib/persistence/db';
 import { getAllChats, type Chat } from '~/lib/persistence/chats';
-import { DataVisualization } from './DataVisualization';
+// Lazy-load DataVisualization: it pulls in chart.js + react-chartjs-2 (the single largest dependency
+// in the settings bundle). Only load it when the Data tab is actually rendered.
+const DataVisualization = lazy(() =>
+  import('./DataVisualization').then((module) => ({ default: module.DataVisualization })),
+);
 import { classNames } from '~/utils/classNames';
 import { toast } from 'react-toastify';
 
@@ -712,7 +716,9 @@ export function DataTab() {
         <h2 className="text-xl font-semibold mb-4 text-bolt-elements-textPrimary">Data Usage</h2>
         <Card>
           <CardContent className="p-5">
-            <DataVisualization chats={availableChats} />
+            <Suspense fallback={<div className="text-bolt-elements-textSecondary text-sm">Loading charts…</div>}>
+              <DataVisualization chats={availableChats} />
+            </Suspense>
           </CardContent>
         </Card>
       </div>

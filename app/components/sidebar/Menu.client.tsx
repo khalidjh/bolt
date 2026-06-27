@@ -1,9 +1,16 @@
 import { motion, type Variants } from 'framer-motion';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { Dialog, DialogButton, DialogDescription, DialogRoot, DialogTitle } from '~/components/ui/Dialog';
 import { ThemeSwitch } from '~/components/ui/ThemeSwitch';
-import { ControlPanel } from '~/components/@settings/core/ControlPanel';
+
+// Lazy-load the settings ControlPanel: it statically pulls in all 14 settings tabs, which in turn
+// drag chart.js, jsPDF and other multi-MB libs into whatever route renders the sidebar (i.e. the
+// landing page). The panel is only ever shown once the user opens settings, so keep it out of the
+// initial route graph and load it on first open.
+const ControlPanel = lazy(() =>
+  import('~/components/@settings/core/ControlPanel').then((module) => ({ default: module.ControlPanel })),
+);
 import { SettingsButton, HelpButton } from '~/components/ui/SettingsButton';
 import { Button } from '~/components/ui/Button';
 import { db, deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory } from '~/lib/persistence';
@@ -70,6 +77,10 @@ export const Menu = () => {
   const [open, setOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Once settings has been opened we keep the (lazily-loaded) panel mounted so its close animation
+  // can play and reopening is instant; it stays out of the bundle until the first open.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const profile = useStore(profileStore);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -309,6 +320,7 @@ export const Menu = () => {
   };
 
   const handleSettingsClick = () => {
+    setSettingsLoaded(true);
     setIsSettingsOpen(true);
     setOpen(false);
   };
@@ -534,7 +546,11 @@ export const Menu = () => {
         </div>
       </motion.div>
 
-      <ControlPanel open={isSettingsOpen} onClose={handleSettingsClose} />
+      {settingsLoaded && (
+        <Suspense fallback={null}>
+          <ControlPanel open={isSettingsOpen} onClose={handleSettingsClose} />
+        </Suspense>
+      )}
     </>
   );
 };
