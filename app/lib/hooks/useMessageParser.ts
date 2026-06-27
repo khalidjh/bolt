@@ -11,7 +11,15 @@ const messageParser = new EnhancedStreamingMessageParser({
     onArtifactOpen: (data) => {
       logger.trace('onArtifactOpen', data);
 
-      workbenchStore.showWorkbench.set(true);
+      /*
+       * Only auto-open the workbench on larger screens. On mobile the workbench covers the whole
+       * screen, so auto-opening yanks the user out of the chat the moment code starts streaming.
+       * Keep them in chat and let them switch to Code via the header toggle.
+       */
+      if (typeof window === 'undefined' || window.innerWidth >= 1024) {
+        workbenchStore.showWorkbench.set(true);
+      }
+
       workbenchStore.addArtifact(data);
     },
     onArtifactClose: (data) => {

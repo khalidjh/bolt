@@ -22,10 +22,13 @@ export function Header() {
           aria-label="Toggle sidebar"
           onClick={() => toggleSidebar()}
         />
-        <a href="/" className="text-2xl font-semibold text-accent flex items-center" aria-label="Etlaq home">
-          <img src="/logo-etlaq-light.svg" alt="Etlaq" className="w-[104px] inline-block dark:hidden" />
-          <img src="/logo-etlaq-dark.svg" alt="Etlaq" className="w-[104px] inline-block hidden dark:block" />
-        </a>
+        {/* Hide the logo/name once a chat starts so the centered chat title has room. */}
+        {!chat.started && (
+          <a href="/" className="text-2xl font-semibold text-accent flex items-center" aria-label="Etlaq home">
+            <img src="/logo-etlaq-light.svg" alt="Etlaq" className="w-[104px] inline-block dark:hidden" />
+            <img src="/logo-etlaq-dark.svg" alt="Etlaq" className="w-[104px] inline-block hidden dark:block" />
+          </a>
+        )}
       </div>
       {chat.started && ( // Display ChatDescription and HeaderActionButtons only when the chat has started.
         <>

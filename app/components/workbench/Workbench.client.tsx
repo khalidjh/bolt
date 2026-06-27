@@ -406,7 +406,7 @@ export const Workbench = memo(
                   <Slider selected={selectedView} options={sliderOptions} setSelected={setSelectedView} />
                   <div className="ml-auto" />
                   {selectedView === 'code' && (
-                    <div className="flex overflow-y-auto">
+                    <div className="flex items-center overflow-x-auto">
                       {/* Export Chat Button */}
                       <ExportChatButton exportChat={exportChat} />
 

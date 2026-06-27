@@ -19,40 +19,29 @@ export function HeaderActionButtons({ chatStarted }: HeaderActionButtonsProps) {
 
   return (
     <div className="flex items-center gap-1">
-      {/* Mobile-only Chat / Code toggle: below `lg` the workbench covers the whole screen and its
-          built-in chat toggle is disabled, leaving no way back to the chat. This switches between
-          the two views by sliding the workbench panel in/out. */}
+      {/* Mobile-only single toggle: below `lg` the workbench covers the whole screen, so one button
+          flips between chat and code. It shows the OTHER view's label (in chat → "Code", in code →
+          "Chat") and stays compact so the centered chat title has room. */}
       {chatStarted && (
-        <div className="flex lg:hidden mr-1 border border-bolt-elements-borderColor rounded-md overflow-hidden text-xs">
-          <button
-            onClick={() => {
+        <button
+          onClick={() => {
+            if (showWorkbench) {
               chatStore.setKey('showChat', true);
               workbenchStore.showWorkbench.set(false);
-            }}
-            className={classNames('flex items-center gap-1.5 px-3 py-1.5 transition-colors', {
-              'bg-accent-500 text-white': !showWorkbench,
-              'bg-bolt-elements-background-depth-2 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary':
-                showWorkbench,
-            })}
-            title="Show chat"
-          >
-            <div className="i-ph:chat-circle-duotone" />
-            Chat
-          </button>
-          <div className="w-px bg-bolt-elements-borderColor" />
-          <button
-            onClick={() => workbenchStore.showWorkbench.set(true)}
-            className={classNames('flex items-center gap-1.5 px-3 py-1.5 transition-colors', {
-              'bg-accent-500 text-white': showWorkbench,
-              'bg-bolt-elements-background-depth-2 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary':
-                !showWorkbench,
-            })}
-            title="Show code"
-          >
-            <div className="i-ph:code-duotone" />
-            Code
-          </button>
-        </div>
+            } else {
+              workbenchStore.showWorkbench.set(true);
+            }
+          }}
+          className={classNames(
+            'flex lg:hidden items-center justify-center gap-1.5 mr-1 px-3 py-1.5 rounded-md text-xs transition-colors',
+            'border border-bolt-elements-borderColor bg-bolt-elements-background-depth-2',
+            'text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary',
+          )}
+          title={showWorkbench ? 'Show chat' : 'Show code'}
+        >
+          <div className={showWorkbench ? 'i-ph:chat-circle-duotone' : 'i-ph:code-duotone'} />
+          {showWorkbench ? 'Chat' : 'Code'}
+        </button>
       )}
 
       {/* Deploy Button */}
