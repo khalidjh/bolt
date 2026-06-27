@@ -88,7 +88,7 @@ export const EditorPanel = memo(
               <div className="h-full">
                 <Tabs.Root defaultValue="files" className="flex flex-col h-full">
                   <PanelHeader className="w-full text-sm font-medium text-bolt-elements-textSecondary px-1">
-                    <div className="h-full flex-shrink-0 flex items-center justify-between w-full">
+                    <div className="h-full flex-shrink-0 flex items-center justify-between w-full overflow-x-auto modern-scrollbar">
                       <Tabs.List className="h-full flex-shrink-0 flex items-center">
                         <Tabs.Trigger
                           value="files"

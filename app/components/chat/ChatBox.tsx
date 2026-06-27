@@ -9,7 +9,6 @@ import { toast } from 'react-toastify';
 import { SpeechRecognitionButton } from '~/components/chat/SpeechRecognition';
 import { SupabaseConnection } from './SupabaseConnection';
 import { ExpoQrModal } from '~/components/workbench/ExpoQrModal';
-import styles from './BaseChat.module.scss';
 import type { ProviderInfo } from '~/types/model';
 import { ColorSchemeDialog } from '~/components/ui/ColorSchemeDialog';
 import type { DesignScheme } from '~/types/design-scheme';
@@ -65,7 +64,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
   return (
     <div
       className={classNames(
-        'relative bg-bolt-elements-background-depth-2 backdrop-blur p-3 rounded-lg border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
+        'relative bg-bolt-elements-background-depth-2 backdrop-blur p-3 rounded-3xl border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
 
         /*
          * {
@@ -74,32 +73,6 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
          */
       )}
     >
-      <svg className={classNames(styles.PromptEffectContainer)}>
-        <defs>
-          <linearGradient
-            id="line-gradient"
-            x1="20%"
-            y1="0%"
-            x2="-14%"
-            y2="10%"
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="rotate(-45)"
-          >
-            <stop offset="0%" stopColor="#3066F5" stopOpacity="0%"></stop>
-            <stop offset="40%" stopColor="#3066F5" stopOpacity="80%"></stop>
-            <stop offset="50%" stopColor="#3066F5" stopOpacity="80%"></stop>
-            <stop offset="100%" stopColor="#3066F5" stopOpacity="0%"></stop>
-          </linearGradient>
-          <linearGradient id="shine-gradient">
-            <stop offset="0%" stopColor="white" stopOpacity="0%"></stop>
-            <stop offset="40%" stopColor="#ffffff" stopOpacity="80%"></stop>
-            <stop offset="50%" stopColor="#ffffff" stopOpacity="80%"></stop>
-            <stop offset="100%" stopColor="white" stopOpacity="0%"></stop>
-          </linearGradient>
-        </defs>
-        <rect className={classNames(styles.PromptEffectLine)} pathLength="100" strokeLinecap="round"></rect>
-        <rect className={classNames(styles.PromptShine)} x="48" y="24" width="70" height="1"></rect>
-      </svg>
       {/* Model/provider selector and API-key manager removed: this deployment is locked to a single Z.ai GLM model. */}
       <FilePreview
         files={props.uploadedFiles}
@@ -135,9 +108,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
           </button>
         </div>
       )}
-      <div
-        className={classNames('relative shadow-xs border border-bolt-elements-borderColor backdrop-blur rounded-lg')}
-      >
+      <div className={classNames('relative backdrop-blur rounded-2xl')}>
         <textarea
           ref={props.textareaRef}
           className={classNames(

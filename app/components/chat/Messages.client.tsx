@@ -73,8 +73,8 @@ export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
               return (
                 <div
                   key={index}
-                  className={classNames('flex gap-4 py-3 w-full rounded-lg', {
-                    'mt-4': !isFirst,
+                  className={classNames('flex gap-4 py-4 w-full rounded-lg', {
+                    'mt-6': !isFirst,
                   })}
                 >
                   <div className="grid grid-col-1 w-full">
@@ -101,7 +101,7 @@ export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
               );
             })
           : null}
-        {isWaitingForResponse && <ThinkingIndicator className="w-full justify-center" />}
+        {isWaitingForResponse && <ThinkingIndicator className="w-full justify-start" />}
       </div>
     );
   },

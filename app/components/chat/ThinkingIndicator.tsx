@@ -54,7 +54,6 @@ export function ThinkingIndicator({ className }: { className?: string }) {
 
   return (
     <div className={classNames('flex items-center gap-2 mt-4 select-none', className)}>
-      <div className="i-svg-spinners:90-ring-with-bg text-bolt-elements-item-contentAccent text-lg" />
       <span
         key={word}
         className="text-sm font-medium animate-fade-in bg-gradient-to-r from-accent-500 to-accent-400 bg-clip-text text-transparent"
