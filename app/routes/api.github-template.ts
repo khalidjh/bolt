@@ -1,5 +1,6 @@
 import { json } from '@remix-run/cloudflare';
 import JSZip from 'jszip';
+import { githubApiFetch } from '~/lib/api/githubFetch';
 
 // Function to detect if we're running in Cloudflare
 function isCloudflareEnvironment(context: any): boolean {
@@ -19,13 +20,7 @@ async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
   const baseUrl = 'https://api.github.com';
 
   // Get repository info to find default branch
-  const repoResponse = await fetch(`${baseUrl}/repos/${repo}`, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'etlaq-app',
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
-  });
+  const repoResponse = await githubApiFetch(`${baseUrl}/repos/${repo}`, githubToken);
 
   if (!repoResponse.ok) {
     throw new Error(`Repository not found: ${repo}`);
@@ -35,13 +30,10 @@ async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
   const defaultBranch = repoData.default_branch;
 
   // Get the tree recursively
-  const treeResponse = await fetch(`${baseUrl}/repos/${repo}/git/trees/${defaultBranch}?recursive=1`, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'etlaq-app',
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
-  });
+  const treeResponse = await githubApiFetch(
+    `${baseUrl}/repos/${repo}/git/trees/${defaultBranch}?recursive=1`,
+    githubToken,
+  );
 
   if (!treeResponse.ok) {
     throw new Error(`Failed to fetch repository tree: ${treeResponse.status}`);
@@ -81,13 +73,7 @@ async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
     const batch = files.slice(i, i + batchSize);
     const batchPromises = batch.map(async (file: any) => {
       try {
-        const contentResponse = await fetch(`${baseUrl}/repos/${repo}/contents/${file.path}`, {
-          headers: {
-            Accept: 'application/vnd.github.v3+json',
-            'User-Agent': 'etlaq-app',
-            ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-          },
-        });
+        const contentResponse = await githubApiFetch(`${baseUrl}/repos/${repo}/contents/${file.path}`, githubToken);
 
         if (!contentResponse.ok) {
           console.warn(`Failed to fetch ${file.path}: ${contentResponse.status}`);
@@ -125,13 +111,7 @@ async function fetchRepoContentsZip(repo: string, githubToken?: string) {
   const baseUrl = 'https://api.github.com';
 
   // Get the latest release
-  const releaseResponse = await fetch(`${baseUrl}/repos/${repo}/releases/latest`, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'etlaq-app',
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
-  });
+  const releaseResponse = await githubApiFetch(`${baseUrl}/repos/${repo}/releases/latest`, githubToken);
 
   if (!releaseResponse.ok) {
     throw new Error(`GitHub API error: ${releaseResponse.status} - ${releaseResponse.statusText}`);

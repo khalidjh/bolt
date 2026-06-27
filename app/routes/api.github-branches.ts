@@ -1,5 +1,6 @@
 import { json } from '@remix-run/cloudflare';
 import { getApiKeysFromCookie } from '~/lib/api/cookies';
+import { githubApiFetch } from '~/lib/api/githubFetch';
 import { withSecurity } from '~/lib/security';
 
 interface GitHubBranch {
@@ -68,13 +69,7 @@ async function githubBranchesLoader({ request, context }: { request: Request; co
     }
 
     // First, get repository info to know the default branch
-    const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        Authorization: `Bearer ${githubToken}`,
-        'User-Agent': 'etlaq-app',
-      },
-    });
+    const repoResponse = await githubApiFetch(`https://api.github.com/repos/${owner}/${repo}`, githubToken);
 
     if (!repoResponse.ok) {
       if (repoResponse.status === 404) {
@@ -92,13 +87,10 @@ async function githubBranchesLoader({ request, context }: { request: Request; co
     const defaultBranch = repoInfo.default_branch;
 
     // Fetch branches
-    const branchesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`, {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        Authorization: `Bearer ${githubToken}`,
-        'User-Agent': 'etlaq-app',
-      },
-    });
+    const branchesResponse = await githubApiFetch(
+      `https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`,
+      githubToken,
+    );
 
     if (!branchesResponse.ok) {
       throw new Error(`Failed to fetch branches: ${branchesResponse.status}`);

@@ -1,5 +1,6 @@
 import { json } from '@remix-run/cloudflare';
 import { getApiKeysFromCookie } from '~/lib/api/cookies';
+import { githubApiFetch } from '~/lib/api/githubFetch';
 import { withSecurity } from '~/lib/security';
 
 async function githubUserLoader({ request, context }: { request: Request; context: any }) {
@@ -161,14 +162,8 @@ async function githubUserAction({ request, context }: { request: Request; contex
         return json({ error: 'Repository name is required' }, { status: 400 });
       }
 
-      // Fetch repository branches
-      const response = await fetch(`https://api.github.com/repos/${repoFullName}/branches`, {
-        headers: {
-          Accept: 'application/vnd.github.v3+json',
-          Authorization: `Bearer ${githubToken}`,
-          'User-Agent': 'etlaq-app',
-        },
-      });
+      // Fetch repository branches (public-capable — fall back to anonymous on a bad token)
+      const response = await githubApiFetch(`https://api.github.com/repos/${repoFullName}/branches`, githubToken);
 
       if (!response.ok) {
         throw new Error(`GitHub API error: ${response.status}`);
@@ -207,16 +202,10 @@ async function githubUserAction({ request, context }: { request: Request; contex
         return json({ error: 'Search query is required' }, { status: 400 });
       }
 
-      // Search repositories using GitHub API
-      const response = await fetch(
+      // Search repositories using GitHub API (public — fall back to anonymous on a bad token)
+      const response = await githubApiFetch(
         `https://api.github.com/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&sort=updated`,
-        {
-          headers: {
-            Accept: 'application/vnd.github.v3+json',
-            Authorization: `Bearer ${githubToken}`,
-            'User-Agent': 'etlaq-app',
-          },
-        },
+        githubToken,
       );
 
       if (!response.ok) {
