@@ -55,11 +55,9 @@ const inlineThemeCode = stripIndents`
   setTutorialKitTheme();
 
   function setTutorialKitTheme() {
-    let theme = localStorage.getItem('bolt_theme');
-
-    if (!theme) {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    // Default to light unless the user has explicitly chosen a theme before (ignore the OS
+    // preference so a dark-mode OS doesn't force the app into dark on first visit).
+    let theme = localStorage.getItem('bolt_theme') || 'light';
 
     document.querySelector('html')?.setAttribute('data-theme', theme);
   }

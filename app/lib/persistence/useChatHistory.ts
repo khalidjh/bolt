@@ -170,7 +170,7 @@ ${value.content}
                  */
                 ...filteredMessages,
               ];
-              restoreSnapshot(mixedId);
+              await restoreSnapshot(mixedId, validSnapshot);
             }
 
             setInitialMessages(filteredMessages);
@@ -232,27 +232,37 @@ ${value.content}
       return;
     }
 
-    Object.entries(validSnapshot.files).forEach(async ([key, value]) => {
-      if (key.startsWith(container.workdir)) {
-        key = key.replace(container.workdir, '');
+    const normalize = (key: string) => (key.startsWith(container.workdir) ? key.replace(container.workdir, '') : key);
+
+    /*
+     * Write every entry back, awaiting each one. The previous version used `forEach(async ...)`,
+     * which does NOT await the callbacks: the folder and file passes raced, so a nested file could
+     * be written before its parent directory existed (the write then threw ENOENT and was silently
+     * swallowed), leaving the project incomplete and the preview/deploy blank. Create each file's
+     * parent directory immediately before writing it so order can't matter.
+     */
+    for (const [rawKey, value] of Object.entries(validSnapshot.files)) {
+      if (value?.type !== 'folder') {
+        continue;
       }
 
-      if (value?.type === 'folder') {
-        await container.fs.mkdir(key, { recursive: true });
-      }
-    });
-    Object.entries(validSnapshot.files).forEach(async ([key, value]) => {
-      if (value?.type === 'file') {
-        if (key.startsWith(container.workdir)) {
-          key = key.replace(container.workdir, '');
-        }
+      await container.fs.mkdir(normalize(rawKey), { recursive: true });
+    }
 
-        await container.fs.writeFile(key, value.content, { encoding: value.isBinary ? undefined : 'utf8' });
-      } else {
+    for (const [rawKey, value] of Object.entries(validSnapshot.files)) {
+      if (value?.type !== 'file') {
+        continue;
       }
-    });
 
-    // workbenchStore.files.setKey(snapshot?.files)
+      const key = normalize(rawKey);
+      const folder = key.split('/').slice(0, -1).join('/');
+
+      if (folder && folder !== '.' && folder !== '/') {
+        await container.fs.mkdir(folder, { recursive: true });
+      }
+
+      await container.fs.writeFile(key, value.content, { encoding: value.isBinary ? undefined : 'utf8' });
+    }
   }, []);
 
   return {

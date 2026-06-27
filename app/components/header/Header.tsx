@@ -18,6 +18,7 @@ export function Header() {
     >
       <div className="flex items-center gap-2 z-logo text-bolt-elements-textPrimary">
         <button
+          data-sidebar-toggle
           className="i-ph:sidebar-simple-duotone text-xl text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors cursor-pointer"
           aria-label="Toggle sidebar"
           onClick={() => toggleSidebar()}

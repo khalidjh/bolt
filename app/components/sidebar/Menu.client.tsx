@@ -24,6 +24,8 @@ import { classNames } from '~/utils/classNames';
 import { useStore } from '@nanostores/react';
 import { profileStore } from '~/lib/stores/profile';
 import { sidebarOpenStore } from '~/lib/stores/sidebar';
+import { workbenchStore } from '~/lib/stores/workbench';
+import { DeployButton } from '~/components/deploy/DeployButton';
 
 const menuVariants = {
   closed: {
@@ -79,6 +81,8 @@ export const Menu = () => {
   const [list, setList] = useState<ChatHistoryItem[]>([]);
   const open = useStore(sidebarOpenStore);
   const setOpen = (value: boolean) => sidebarOpenStore.set(value);
+  const previews = useStore(workbenchStore.previews);
+  const hasPreview = previews.length > 0;
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -293,30 +297,37 @@ export const Menu = () => {
     }
   }, [open, selectionMode]);
 
-  useEffect(() => {
-    const enterThreshold = 20;
-    const exitThreshold = 20;
+  // The sidebar now opens only when the header sidebar icon is clicked (toggleSidebar). The previous
+  // edge-hover behavior (open when the mouse touched the left edge, close when it moved away) was
+  // removed so the menu doesn't appear/disappear on stray mouse movement.
 
-    function onMouseMove(event: MouseEvent) {
-      if (isSettingsOpen) {
+  // Close the sidebar when clicking outside of it. We skip clicks on the header toggle (it has its
+  // own handler — letting both fire would close-then-reopen) and clicks inside a portalled modal
+  // dialog (e.g. the delete confirmation, which renders outside the menu's DOM subtree).
+  useEffect(() => {
+    if (!open || dialogContent) {
+      return undefined;
+    }
+
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as Element | null;
+
+      if (
+        !target ||
+        menuRef.current?.contains(target) ||
+        target.closest('[data-sidebar-toggle]') ||
+        target.closest('[role="dialog"]')
+      ) {
         return;
       }
 
-      if (event.pageX < enterThreshold) {
-        setOpen(true);
-      }
-
-      if (menuRef.current && event.clientX > menuRef.current.getBoundingClientRect().right + exitThreshold) {
-        setOpen(false);
-      }
+      setOpen(false);
     }
 
-    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousedown', onPointerDown);
 
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-    };
-  }, [isSettingsOpen]);
+    return () => window.removeEventListener('mousedown', onPointerDown);
+  }, [open, dialogContent]);
 
   const handleDuplicate = async (id: string) => {
     await duplicateCurrentChat(id);
@@ -354,7 +365,12 @@ export const Menu = () => {
         )}
       >
         <div className="h-12 flex items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50 rounded-tr-2xl">
-          <div className="text-gray-900 dark:text-white font-medium"></div>
+          {/* Offset right so the logo clears the header's sidebar-toggle icon, which floats above the
+              open sidebar (z-logo > z-sidebar) at the top-left corner. */}
+          <a href="/" className="flex items-center ml-8" aria-label="Etlaq home">
+            <img src="/logo-etlaq-light.svg" alt="Etlaq" className="w-[88px] inline-block dark:hidden" />
+            <img src="/logo-etlaq-dark.svg" alt="Etlaq" className="w-[88px] inline-block hidden dark:block" />
+          </a>
           <div className="flex items-center gap-3">
             <HelpButton onClick={() => window.open('https://stackblitz-labs.github.io/bolt.diy/', '_blank')} />
             <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
@@ -417,6 +433,43 @@ export const Menu = () => {
             <ImportButtons importChat={importChat} />
             <GitCloneButton importChat={importChat} className="w-full" />
           </div>
+          {/* Deploy + debug actions — the header hides these below `lg` to stay uncluttered, so surface
+              them here on smaller screens. Only shown once a preview exists (i.e. a project is running). */}
+          {hasPreview && (
+            <div className="lg:hidden px-4 pb-3 flex flex-col items-stretch gap-2 border-b border-gray-200 dark:border-gray-800 mb-1">
+              <DeployButton />
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    window.open(
+                      'https://github.com/stackblitz-labs/bolt.diy/issues/new?template=bug_report.yml',
+                      '_blank',
+                    )
+                  }
+                  className="flex-1 flex gap-2 items-center justify-center rounded-lg px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors"
+                  title="Report Bug"
+                >
+                  <div className="i-ph:bug h-4 w-4" />
+                  Report Bug
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const { downloadDebugLog } = await import('~/utils/debugLogger');
+                      await downloadDebugLog();
+                    } catch (error) {
+                      console.error('Failed to download debug log:', error);
+                    }
+                  }}
+                  className="flex-1 flex gap-2 items-center justify-center rounded-lg px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors"
+                  title="Download Debug Log"
+                >
+                  <div className="i-ph:download h-4 w-4" />
+                  Debug Log
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm px-4 py-2">
             <div className="font-medium text-gray-600 dark:text-gray-400">Your Chats</div>
             {selectionMode && (

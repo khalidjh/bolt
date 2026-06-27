@@ -1,6 +1,7 @@
 import { RemixBrowser } from '@remix-run/react';
 import { startTransition } from 'react';
 import { hydrateRoot } from 'react-dom/client';
+import { streamingState } from '~/lib/stores/streaming';
 
 /**
  * After a redeploy, asset hashes change. A browser still running the previous
@@ -11,7 +12,7 @@ import { hydrateRoot } from 'react-dom/client';
  * A short cooldown (stored in sessionStorage) prevents an infinite reload loop
  * if the failure is caused by something other than a stale deploy.
  */
-function handleStaleChunkError() {
+function performStaleChunkReload() {
   const COUNT_KEY = 'etlaq:staleReload:count';
   const TS_KEY = 'etlaq:staleReload:lastTs';
   const PARAM = '_staleReload';
@@ -63,6 +64,34 @@ function handleStaleChunkError() {
     url.searchParams.set(PARAM, String(count + 1));
     window.location.replace(url.toString());
   }
+}
+
+let reloadDeferred = false;
+
+/**
+ * A stale lazy chunk (e.g. the code editor / terminal) commonly fails to load the moment the
+ * workbench mounts — which is exactly while the assistant is streaming code. A full-page reload
+ * there throws away the in-progress generation and drops the user into a snapshot restore. So if a
+ * generation is actively streaming, defer the reload until it finishes; otherwise reload right away.
+ */
+function handleStaleChunkError() {
+  if (!streamingState.get()) {
+    performStaleChunkReload();
+    return;
+  }
+
+  if (reloadDeferred) {
+    return;
+  }
+
+  reloadDeferred = true;
+
+  const unsubscribe = streamingState.listen((streaming) => {
+    if (!streaming) {
+      unsubscribe();
+      performStaleChunkReload();
+    }
+  });
 }
 
 // Vite dispatches this when a dynamic import / module preload fails to load.
