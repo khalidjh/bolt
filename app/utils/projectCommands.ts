@@ -77,8 +77,13 @@ export async function detectProjectCommands(files: FileContent[]): Promise<Proje
       // WebContainer's in-browser npm cache occasionally corrupts mid-download and fails with
       // "EIO: '<pkg>' not found in cache" — a transient error. Retry once after clearing the
       // cache so a single hiccup doesn't leave node_modules half-installed and break the preview.
+      // Install dependencies FIRST (with a cache-clean retry), then refresh browserslist's
+      // caniuse-lite. update-browserslist-db must run after node_modules exists, and it must not
+      // gate the install: chaining it ahead with `&&` meant a slow/interrupted browserslist step
+      // left node_modules uninstalled, so `npm run dev` failed with "command not found: vite".
+      // Keep it last and non-fatal (|| true) so it can never block the install.
       let baseSetupCommand =
-        'npx update-browserslist-db@latest && (npm install || (npm cache clean --force && npm install))';
+        '(npm install || (npm cache clean --force && npm install)) && (npx update-browserslist-db@latest || true)';
 
       // Add shadcn init if it's a shadcn project
       if (isShadcnProject) {
