@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { Message } from 'ai';
 import { toast } from 'react-toastify';
 import { MAX_FILES, isBinaryFile, shouldIncludeFile } from '~/utils/fileUtils';
@@ -14,6 +14,10 @@ interface ImportFolderButtonProps {
 
 export const ImportFolderButton: React.FC<ImportFolderButtonProps> = ({ className, importChat }) => {
   const [isLoading, setIsLoading] = useState(false);
+
+  // Use a ref instead of a hard-coded id so this button can be rendered in more than one place
+  // (e.g. the landing page and the mobile sidebar) without duplicate-id collisions.
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const allFiles = Array.from(e.target.files || []);
@@ -106,8 +110,8 @@ export const ImportFolderButton: React.FC<ImportFolderButtonProps> = ({ classNam
   return (
     <>
       <input
+        ref={inputRef}
         type="file"
-        id="folder-import"
         className="hidden"
         webkitdirectory=""
         directory=""
@@ -116,8 +120,7 @@ export const ImportFolderButton: React.FC<ImportFolderButtonProps> = ({ classNam
       />
       <Button
         onClick={() => {
-          const input = document.getElementById('folder-import');
-          input?.click();
+          inputRef.current?.click();
         }}
         title="Import Folder"
         variant="default"

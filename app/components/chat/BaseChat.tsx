@@ -481,7 +481,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             <div className="flex flex-col justify-center">
               {!chatStarted && (
                 <div className="hidden sm:flex justify-center gap-2">
-                  {ImportButtons(importChat)}
+                  <ImportButtons importChat={importChat} />
                   <GitCloneButton importChat={importChat} />
                 </div>
               )}

@@ -13,6 +13,8 @@ const ControlPanel = lazy(() =>
 );
 import { SettingsButton, HelpButton } from '~/components/ui/SettingsButton';
 import { Button } from '~/components/ui/Button';
+import { ImportButtons } from '~/components/chat/chatExportAndImport/ImportButtons';
+import GitCloneButton from '~/components/chat/GitCloneButton';
 import { db, deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory } from '~/lib/persistence';
 import { cubicEasingFn } from '~/utils/easings';
 import { HistoryItem } from './HistoryItem';
@@ -71,7 +73,7 @@ function CurrentDateTime() {
 }
 
 export const Menu = () => {
-  const { duplicateCurrentChat, exportChat } = useChatHistory();
+  const { duplicateCurrentChat, exportChat, importChat } = useChatHistory();
   const menuRef = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<ChatHistoryItem[]>([]);
   const [open, setOpen] = useState(false);
@@ -407,6 +409,11 @@ export const Menu = () => {
                 aria-label="Search chats"
               />
             </div>
+          </div>
+          {/* Import / clone actions — shown only on mobile, where the landing-page button row is hidden */}
+          <div className="sm:hidden px-4 pb-3 flex flex-col items-stretch gap-2 border-b border-gray-200 dark:border-gray-800 mb-1">
+            <ImportButtons importChat={importChat} />
+            <GitCloneButton importChat={importChat} className="w-full" />
           </div>
           <div className="flex items-center justify-between text-sm px-4 py-2">
             <div className="font-medium text-gray-600 dark:text-gray-400">Your Chats</div>

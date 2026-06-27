@@ -1,4 +1,5 @@
 import type { Message } from 'ai';
+import { useRef } from 'react';
 import { toast } from 'react-toastify';
 import { ImportFolderButton } from '~/components/chat/ImportFolderButton';
 import { Button } from '~/components/ui/Button';
@@ -9,12 +10,20 @@ type ChatData = {
   description?: string; // Optional description
 };
 
-export function ImportButtons(importChat: ((description: string, messages: Message[]) => Promise<void>) | undefined) {
+interface ImportButtonsProps {
+  importChat: ((description: string, messages: Message[]) => Promise<void>) | undefined;
+}
+
+export function ImportButtons({ importChat }: ImportButtonsProps) {
+  // Ref (not a hard-coded id) so this can render in multiple places — landing page and the mobile
+  // sidebar — without duplicate-id collisions.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="flex flex-col items-center justify-center w-auto">
       <input
+        ref={fileInputRef}
         type="file"
-        id="chat-import"
         className="hidden"
         accept=".json"
         onChange={async (e) => {
@@ -61,8 +70,7 @@ export function ImportButtons(importChat: ((description: string, messages: Messa
         <div className="flex gap-2">
           <Button
             onClick={() => {
-              const input = document.getElementById('chat-import');
-              input?.click();
+              fileInputRef.current?.click();
             }}
             variant="default"
             size="lg"
