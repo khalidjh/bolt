@@ -61,6 +61,8 @@ interface ChatBoxProps {
 }
 
 export const ChatBox: React.FC<ChatBoxProps> = (props) => {
+  const [toolsOpen, setToolsOpen] = React.useState(false);
+
   return (
     <div
       className={classNames(
@@ -199,52 +201,126 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
           )}
         </ClientOnly>
         <div className="flex flex-wrap gap-y-2 justify-between items-center text-sm p-4 pt-2">
-          <div className="flex flex-wrap gap-1 items-center">
-            <ColorSchemeDialog designScheme={props.designScheme} setDesignScheme={props.setDesignScheme} />
-            <McpTools />
-            <IconButton title="Upload file" className="transition-all" onClick={() => props.handleFileUpload()}>
-              <div className="i-ph:paperclip text-xl"></div>
-            </IconButton>
-            <WebSearch onSearchResult={(result) => props.onWebSearchResult?.(result)} disabled={props.isStreaming} />
+          <div className="relative">
+            {/* Single "+" trigger that opens a tray with every chat tool — keeps the input row clean,
+                especially on mobile. */}
             <IconButton
-              title="Enhance prompt"
-              disabled={props.input.length === 0 || props.enhancingPrompt}
-              className={classNames('transition-all', props.enhancingPrompt ? 'opacity-100' : '')}
-              onClick={() => {
-                props.enhancePrompt?.();
-                toast.success('Prompt enhanced!');
-              }}
-            >
-              {props.enhancingPrompt ? (
-                <div className="i-svg-spinners:90-ring-with-bg text-bolt-elements-loader-progress text-xl animate-spin"></div>
-              ) : (
-                <div className="i-bolt:stars text-xl"></div>
+              title="Tools"
+              className={classNames(
+                'transition-all',
+                toolsOpen ? '!bg-bolt-elements-item-backgroundAccent !text-bolt-elements-item-contentAccent' : '',
               )}
+              onClick={() => setToolsOpen((v) => !v)}
+            >
+              <div className="i-ph:plus text-xl" />
             </IconButton>
 
-            <SpeechRecognitionButton
-              isListening={props.isListening}
-              onStart={props.startListening}
-              onStop={props.stopListening}
-              disabled={props.isStreaming}
-            />
-            {props.chatStarted && (
-              <IconButton
-                title="Discuss"
-                className={classNames(
-                  'transition-all flex items-center gap-1 px-1.5',
-                  props.chatMode === 'discuss'
-                    ? '!bg-bolt-elements-item-backgroundAccent !text-bolt-elements-item-contentAccent'
-                    : 'bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault',
-                )}
-                onClick={() => {
-                  props.setChatMode?.(props.chatMode === 'discuss' ? 'build' : 'discuss');
-                }}
+            {/* click-away backdrop */}
+            {toolsOpen && <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />}
+
+            {/* Tray is always mounted (toggled via `hidden`) so a tool's own dialog/popover survives
+                the tray closing when its row is clicked. */}
+            <div
+              className={classNames(
+                'absolute bottom-full left-0 mb-2 z-50 w-56 p-1.5 flex-col gap-0.5',
+                'rounded-2xl border border-bolt-elements-borderColor bg-bolt-elements-background-depth-2 shadow-lg',
+                toolsOpen ? 'flex' : 'hidden',
+              )}
+            >
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={() => setToolsOpen(false)}
               >
-                <div className={`i-ph:chats text-xl`} />
-                {props.chatMode === 'discuss' ? <span>Discuss</span> : <span />}
-              </IconButton>
-            )}
+                <ColorSchemeDialog designScheme={props.designScheme} setDesignScheme={props.setDesignScheme} />
+                <span className="text-sm text-bolt-elements-textSecondary">Design palette</span>
+              </div>
+
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={() => setToolsOpen(false)}
+              >
+                <IconButton title="Upload file" className="transition-all" onClick={() => props.handleFileUpload()}>
+                  <div className="i-ph:paperclip text-xl" />
+                </IconButton>
+                <span className="text-sm text-bolt-elements-textSecondary">Upload file</span>
+              </div>
+
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={() => setToolsOpen(false)}
+              >
+                <WebSearch onSearchResult={(result) => props.onWebSearchResult?.(result)} disabled={props.isStreaming} />
+                <span className="text-sm text-bolt-elements-textSecondary">Web search</span>
+              </div>
+
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={() => setToolsOpen(false)}
+              >
+                <IconButton
+                  title="Enhance prompt"
+                  disabled={props.input.length === 0 || props.enhancingPrompt}
+                  className={classNames('transition-all', props.enhancingPrompt ? 'opacity-100' : '')}
+                  onClick={() => {
+                    props.enhancePrompt?.();
+                    toast.success('Prompt enhanced!');
+                  }}
+                >
+                  {props.enhancingPrompt ? (
+                    <div className="i-svg-spinners:90-ring-with-bg text-bolt-elements-loader-progress text-xl animate-spin" />
+                  ) : (
+                    <div className="i-bolt:stars text-xl" />
+                  )}
+                </IconButton>
+                <span className="text-sm text-bolt-elements-textSecondary">Enhance prompt</span>
+              </div>
+
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={() => setToolsOpen(false)}
+              >
+                <SpeechRecognitionButton
+                  isListening={props.isListening}
+                  onStart={props.startListening}
+                  onStop={props.stopListening}
+                  disabled={props.isStreaming}
+                />
+                <span className="text-sm text-bolt-elements-textSecondary">Voice input</span>
+              </div>
+
+              <div
+                className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                onClick={() => setToolsOpen(false)}
+              >
+                <McpTools />
+                <span className="text-sm text-bolt-elements-textSecondary">MCP tools</span>
+              </div>
+
+              {props.chatStarted && (
+                <div
+                  className="flex items-center gap-2.5 pr-3 rounded-xl hover:bg-bolt-elements-background-depth-3 transition-colors cursor-pointer"
+                  onClick={() => setToolsOpen(false)}
+                >
+                  <IconButton
+                    title="Discuss"
+                    className={classNames(
+                      'transition-all',
+                      props.chatMode === 'discuss'
+                        ? '!bg-bolt-elements-item-backgroundAccent !text-bolt-elements-item-contentAccent'
+                        : '',
+                    )}
+                    onClick={() => {
+                      props.setChatMode?.(props.chatMode === 'discuss' ? 'build' : 'discuss');
+                    }}
+                  >
+                    <div className="i-ph:chats text-xl" />
+                  </IconButton>
+                  <span className="text-sm text-bolt-elements-textSecondary">
+                    {props.chatMode === 'discuss' ? 'Discuss mode (on)' : 'Discuss mode'}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
           {props.input.length > 3 ? (
             <div className="hidden sm:block text-xs text-bolt-elements-textTertiary">

@@ -299,27 +299,27 @@ export const ColorSchemeDialog: React.FC<ColorSchemeDialogProps> = ({ setDesignS
                 <button
                   key={tab.key}
                   onClick={() => setActiveSection(tab.key as any)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
                     activeSection === tab.key
                       ? 'bg-bolt-elements-background-depth-3 text-bolt-elements-textPrimary shadow-md'
                       : 'bg-bolt-elements-background-depth-2 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary hover:bg-bolt-elements-bg-depth-2'
                   }`}
                 >
-                  <span className={`${tab.icon} text-lg`} />
-                  <span>{tab.label}</span>
+                  <span className={`${tab.icon} text-base shrink-0`} />
+                  <span className="truncate">{tab.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Content Area */}
-            <div className=" min-h-92 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {activeSection === 'colors' && renderColorSection()}
               {activeSection === 'typography' && renderTypographySection()}
               {activeSection === 'features' && renderFeaturesSection()}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap justify-between items-center gap-2">
               <div className="text-sm text-bolt-elements-textSecondary">
                 {Object.keys(palette).length} colors • {font.length} fonts • {features.length} features
               </div>
