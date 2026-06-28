@@ -113,6 +113,14 @@ export class BoltShell {
   #outputStream: ReadableStreamDefaultReader<string> | undefined;
   #shellInputStream: WritableStreamDefaultWriter<string> | undefined;
 
+  /**
+   * The dev server runs as its OWN detached process — never through executeCommand. A long-running
+   * dev server occupying the interactive/action shell would (a) be Ctrl-C'd by the next shell action
+   * and (b) wedge the serialized action queue, since later commands abort and then await its
+   * never-resolving promise. Keeping it on a separate process isolates it completely.
+   */
+  #devProcess: WebContainerProcess | undefined;
+
   constructor() {
     this.#readyPromise = new Promise((resolve) => {
       this.#initialized = resolve;
@@ -266,6 +274,56 @@ export class BoltShell {
     }
 
     return resp;
+  }
+
+  /**
+   * Launch a long-running dev server as a detached process, isolated from the interactive/action
+   * shell. Output is mirrored into the visible terminal (display only — it is NOT fed into the
+   * interactive shell's command parser, so it can't corrupt OSC command detection). A previously
+   * started dev server is killed first so restarts don't leak processes. There is intentionally no
+   * idle watchdog here: a dev server legitimately goes silent once it's up, and must not be killed.
+   */
+  async startDevServer(command: string, onOutput?: (data: string) => void): Promise<WebContainerProcess | undefined> {
+    const webcontainer = this.#webcontainer;
+
+    if (!webcontainer || !this.#terminal) {
+      return undefined;
+    }
+
+    if (this.#devProcess) {
+      try {
+        this.#devProcess.kill();
+      } catch {
+        // process may already be gone
+      }
+
+      this.#devProcess = undefined;
+    }
+
+    const process = await webcontainer.spawn('/bin/jsh', ['-c', command], {
+      terminal: {
+        cols: this.#terminal.cols ?? 80,
+        rows: this.#terminal.rows ?? 15,
+      },
+    });
+
+    this.#devProcess = process;
+
+    const terminal = this.#terminal;
+    process.output
+      .pipeTo(
+        new WritableStream({
+          write(data) {
+            terminal.write(data);
+            onOutput?.(data);
+          },
+        }),
+      )
+      .catch(() => {
+        // stream closed when the process exits — nothing to do
+      });
+
+    return process;
   }
 
   async getCurrentExecutionResult(): Promise<ExecutionResult> {

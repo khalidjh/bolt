@@ -5,7 +5,7 @@ import type { ActionAlert, BoltAction, DeployAlert, FileHistory, SupabaseAction,
 import { createScopedLogger } from '~/utils/logger';
 import { unreachable } from '~/utils/unreachable';
 import type { ActionCallbackData } from './message-parser';
-import type { BoltShell } from '~/utils/shell';
+import { cleanTerminalOutput, type BoltShell } from '~/utils/shell';
 
 const logger = createScopedLogger('ActionRunner');
 
@@ -215,35 +215,41 @@ export class ActionRunner {
           break;
         }
         case 'start': {
-          // making the start app non blocking
+          /*
+           * The dev server is detached and never resolves while healthy, so we don't await it here.
+           * It only settles if the server crashes/exits — handled by the catch below. We mark the
+           * action complete after a short launch delay (the live preview confirms it's actually up).
+           */
+          this.#runStartAction(action).catch((err: Error) => {
+            if (action.abortSignal.aborted) {
+              return;
+            }
 
-          this.#runStartAction(action)
-            .then(() => this.#updateAction(actionId, { status: 'complete' }))
-            .catch((err: Error) => {
-              if (action.abortSignal.aborted) {
-                return;
-              }
+            this.#updateAction(actionId, { status: 'failed', error: 'Action failed' });
+            logger.error(`[${action.type}]:Action failed\n\n`, err);
 
-              this.#updateAction(actionId, { status: 'failed', error: 'Action failed' });
-              logger.error(`[${action.type}]:Action failed\n\n`, err);
+            if (!(err instanceof ActionCommandError)) {
+              return;
+            }
 
-              if (!(err instanceof ActionCommandError)) {
-                return;
-              }
-
-              this.onAlert?.({
-                type: 'error',
-                title: 'Dev Server Failed',
-                description: err.header,
-                content: err.output,
-              });
+            this.onAlert?.({
+              type: 'error',
+              title: 'Dev Server Failed',
+              description: err.header,
+              content: err.output,
             });
+          });
 
           /*
            * adding a delay to avoid any race condition between 2 start actions
            * i am up for a better approach
            */
           await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          // only mark complete if the server didn't already crash (failed) or get aborted in that window
+          if (this.actions.get()[actionId]?.status === 'running') {
+            this.#updateAction(actionId, { status: 'complete' });
+          }
 
           return;
         }
@@ -310,7 +316,7 @@ export class ActionRunner {
 
   async #runStartAction(action: ActionState) {
     if (action.type !== 'start') {
-      unreachable('Expected shell action');
+      unreachable('Expected start action');
     }
 
     if (!this.#shellTerminal) {
@@ -324,17 +330,55 @@ export class ActionRunner {
       unreachable('Shell terminal not found');
     }
 
-    const resp = await shell.executeCommand(this.runnerId.get(), action.content, () => {
-      logger.debug(`[${action.type}]:Aborting Action\n\n`, action);
-      action.abort();
-    });
-    logger.debug(`${action.type} Shell Response: [exit code:${resp?.exitCode}]`);
+    /*
+     * Run the dev server as a detached process rather than through executeCommand. This keeps it off
+     * the shared interactive/action shell, so subsequent shell and file actions are never blocked by
+     * (or accidentally kill) the long-running dev server.
+     */
+    let output = '';
+    const process = await shell.startDevServer(action.content, (data) => {
+      output += data;
 
-    if (resp?.exitCode != 0) {
-      throw new ActionCommandError('Failed To Start Application', resp?.output || 'No Output Available');
+      // keep only a rolling tail so a chatty dev server doesn't grow this unbounded
+      if (output.length > 8192) {
+        output = output.slice(-8192);
+      }
+    });
+
+    if (!process) {
+      throw new ActionCommandError('Failed To Start Application', 'Dev server process could not be spawned');
     }
 
-    return resp;
+    // tie the action's lifecycle to the process so aborting the action stops the dev server
+    if (action.abortSignal.aborted) {
+      try {
+        process.kill();
+      } catch {
+        // already gone
+      }
+    } else {
+      action.abortSignal.addEventListener('abort', () => {
+        try {
+          process.kill();
+        } catch {
+          // already gone
+        }
+      });
+    }
+
+    /*
+     * A healthy dev server never exits, so this only resolves if it crashes or is stopped. The 2s
+     * delay in #executeAction lets a fast-failing server surface its error here before the action is
+     * marked complete.
+     */
+    const exitCode = await process.exit;
+    logger.debug(`${action.type} Dev Server exited: [exit code:${exitCode}]`);
+
+    if (exitCode !== 0 && !action.abortSignal.aborted) {
+      throw new ActionCommandError('Failed To Start Application', cleanTerminalOutput(output) || 'No Output Available');
+    }
+
+    return { output, exitCode };
   }
 
   async #runFileAction(action: ActionState) {
