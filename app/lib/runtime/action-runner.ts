@@ -328,6 +328,11 @@ export class ActionRunner {
       unreachable('Expected shell action');
     }
 
+    // Nothing to run for an empty command — skip instead of spawning a no-op shell invocation.
+    if (!action.content.trim()) {
+      return;
+    }
+
     const shell = this.#shellTerminal();
     await shell.ready();
 

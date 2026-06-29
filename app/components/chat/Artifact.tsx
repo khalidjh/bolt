@@ -48,6 +48,12 @@ export const Artifact = memo(({ artifactId }: ArtifactProps) => {
     computed(artifact.runner.actions, (actions) => {
       // Filter out Supabase actions except for migrations
       return Object.values(actions).filter((action) => {
+        // Drop empty shell/start actions — they render as a blank "Run command" row with an empty
+        // black code box and execute nothing.
+        if ((action.type === 'shell' || action.type === 'start') && !action.content?.trim()) {
+          return false;
+        }
+
         // Exclude actions with type 'supabase' or actions that contain 'supabase' in their content
         return action.type !== 'supabase' && !(action.type === 'shell' && action.content?.includes('supabase'));
       });
@@ -268,7 +274,7 @@ const ActionList = memo(({ actions }: ActionListProps) => {
                   </a>
                 ) : null}
               </div>
-              {(type === 'shell' || type === 'start') && (
+              {(type === 'shell' || type === 'start') && content.trim() && (
                 <ShellCodeBlock
                   classsName={classNames('mt-1', {
                     'mb-3.5': !isLast,
