@@ -431,16 +431,18 @@ export class ActionRunner {
       return;
     }
 
-    let depsReady = false;
+    // Deps are ready only when node_modules/.bin exists and is non-empty (that's where vite/next/etc.
+    // live), so a half-finished install is correctly detected as "not ready".
+    const areDepsReady = async () => {
+      try {
+        const bin = await webcontainer.fs.readdir('node_modules/.bin');
+        return bin.length > 0;
+      } catch {
+        return false;
+      }
+    };
 
-    try {
-      const bin = await webcontainer.fs.readdir('node_modules/.bin');
-      depsReady = bin.length > 0;
-    } catch {
-      depsReady = false;
-    }
-
-    if (depsReady) {
+    if (await areDepsReady()) {
       return;
     }
 
@@ -451,6 +453,17 @@ export class ActionRunner {
       this.runnerId.get(),
       'npm install --no-audit --no-fund || (npm cache clean --force && npm install --no-audit --no-fund)',
     );
+
+    /*
+     * Don't trust the exit code alone: the install can report non-zero for reasons that don't mean
+     * the deps are missing (the idle watchdog firing a Ctrl-C during npm's quiet download phase,
+     * a transient WebContainer hiccup, npm's own post-install noise). The dev server only needs
+     * node_modules to actually be present — so re-check the filesystem and only fail if .bin is still
+     * missing. This avoids a spurious "Failed To Install Dependencies" when the install really worked.
+     */
+    if (await areDepsReady()) {
+      return;
+    }
 
     if (resp?.exitCode !== 0) {
       throw new ActionCommandError('Failed To Install Dependencies', resp?.output || 'No Output Available');
