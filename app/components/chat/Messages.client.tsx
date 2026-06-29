@@ -16,6 +16,12 @@ interface MessagesProps {
   id?: string;
   className?: string;
   isStreaming?: boolean;
+
+  /**
+   * When the progress indicator (near the input) is showing, suppress the thinking loader so we
+   *  only surface a single status line.
+   */
+  hasProgress?: boolean;
   messages?: Message[];
   append?: (message: Message) => void;
   chatMode?: 'discuss' | 'build';
@@ -27,12 +33,14 @@ interface MessagesProps {
 
 export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
   (props: MessagesProps, ref: ForwardedRef<HTMLDivElement> | undefined) => {
-    const { id, isStreaming = false, messages = [] } = props;
+    const { id, isStreaming = false, messages = [], hasProgress = false } = props;
     const location = useLocation();
 
-    // Only show the "thinking" loader while we're waiting for the assistant to start
-    // responding. Once it begins generating code/text, the message (and its code panel)
-    // already convey progress, so the rotating-words loader is redundant.
+    /*
+     * Only show the "thinking" loader while we're waiting for the assistant to start
+     * responding. Once it begins generating code/text, the message (and its code panel)
+     * already convey progress, so the rotating-words loader is redundant.
+     */
     const lastMessage = messages[messages.length - 1];
     const isWaitingForResponse =
       isStreaming && (!lastMessage || lastMessage.role === 'user' || !lastMessage.content?.trim());
@@ -101,7 +109,7 @@ export const Messages = forwardRef<HTMLDivElement, MessagesProps>(
               );
             })
           : null}
-        {isWaitingForResponse && <ThinkingIndicator className="w-full justify-start" />}
+        {isWaitingForResponse && !hasProgress && <ThinkingIndicator className="w-full justify-start" />}
       </div>
     );
   },

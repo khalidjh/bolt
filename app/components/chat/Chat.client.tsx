@@ -176,6 +176,20 @@ export const ChatImpl = memo(
         }
 
         logger.debug('Finished streaming');
+
+        /*
+         * Some models finish a generation without emitting a start command, leaving the project
+         * built but nothing serving (empty terminal, preview never appears). Queue a fallback that
+         * runs after the file actions drain: if no dev server is up and none was requested, detect
+         * the start command and launch it.
+         */
+        workbenchStore.addToExecutionQueue(async () => {
+          try {
+            await workbenchStore.ensureDevServerStarted(message.id);
+          } catch (error) {
+            logger.error('Failed to auto-start dev server', error);
+          }
+        });
       },
       initialMessages,
       initialInput: Cookies.get(PROMPT_COOKIE_KEY) || '',

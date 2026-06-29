@@ -17,6 +17,7 @@ import { extractRelativePath } from '~/utils/diff';
 import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
+import { detectProjectCommands } from '~/utils/projectCommands';
 import type { ActionAlert, DeployAlert, SupabaseAlert } from '~/types/actions';
 
 const { saveAs } = fileSaver;
@@ -603,6 +604,67 @@ export class WorkbenchStore {
   actionStreamSampler = createSampler(async (data: ActionCallbackData, isStreaming: boolean = false) => {
     return await this._runAction(data, isStreaming);
   }, 100); // TODO: remove this magic number to have it configurable
+
+  /**
+   * Guarantee a dev server is running once a generation finishes. The model is supposed to emit a
+   * `<boltAction type="start">` (or a "npm run dev" shell action), but some models omit it entirely
+   * — leaving the files created and nothing serving, so the preview never appears. When no preview
+   * is up and no start/dev action was emitted, detect the project's start command and launch it.
+   * The start action installs dependencies first when they're missing, so this works on a fresh
+   * project. No-op when a server is already up or a start action already exists (avoids double-start).
+   */
+  async ensureDevServerStarted(messageId: string) {
+    // A preview already exists → a server is up.
+    if (this.previews.get().length > 0) {
+      return;
+    }
+
+    const artifact = this.firstArtifact;
+
+    if (!artifact) {
+      return;
+    }
+
+    // Bail if ANY artifact already emitted a start action or a dev-server shell command — let it run.
+    // A response often has more than one artifact (e.g. a bundled "Initial files" artifact plus the
+    // main one), and the start action may live in a later artifact, so we must scan them all — not
+    // just the first — or we'd double-start the dev server.
+    const devCommand =
+      /(^|&&|;|\|)\s*(npm run dev|npm start|npm run start|yarn dev|yarn start|pnpm (run )?dev|pnpm start|bun (run )?dev|vite|next dev|remix vite:dev|astro dev|nuxt dev|ng serve|expo start)\b/i;
+    const alreadyHasDevAction = Object.values(this.artifacts.get()).some((candidate) =>
+      Object.values(candidate.runner.actions.get()).some(
+        (action) =>
+          (action.type === 'start' && !!action.content?.trim()) ||
+          (action.type === 'shell' && devCommand.test(action.content)),
+      ),
+    );
+
+    if (alreadyHasDevAction) {
+      return;
+    }
+
+    // Detect the start command from the generated files (reads package.json scripts, etc.).
+    const files = Object.entries(this.files.get())
+      .map(([filePath, dirent]) => (dirent?.type === 'file' ? { path: filePath, content: dirent.content } : null))
+      .filter((x): x is { path: string; content: string } => !!x);
+
+    const { startCommand } = await detectProjectCommands(files);
+
+    if (!startCommand) {
+      return;
+    }
+
+    const data: ActionCallbackData = {
+      artifactId: artifact.id,
+      messageId,
+      actionId: `auto-start-${artifact.id}`,
+      action: { type: 'start', content: startCommand },
+    };
+
+    // Register then run through the shared queue so it executes after the file actions complete.
+    this.addAction(data);
+    this.runAction(data);
+  }
 
   #getArtifact(id: string) {
     const artifacts = this.artifacts.get();

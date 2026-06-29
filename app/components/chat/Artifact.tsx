@@ -79,7 +79,7 @@ export const Artifact = memo(({ artifactId }: ArtifactProps) => {
 
   return (
     <>
-      <div className="artifact border border-bolt-elements-borderColor flex flex-col overflow-hidden rounded-lg w-full transition-border duration-150">
+      <div className="artifact border border-bolt-elements-borderColor flex flex-col overflow-hidden rounded-xl shadow-sm w-full transition-all duration-150 hover:border-bolt-elements-borderColorActive">
         <div className="flex">
           <button
             className="flex items-stretch bg-bolt-elements-artifacts-background hover:bg-bolt-elements-artifacts-backgroundHover w-full overflow-hidden"

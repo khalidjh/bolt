@@ -42,14 +42,18 @@ export function ThinkingIndicator({ className }: { className?: string }) {
   const [word, setWord] = useState(() => THINKING_WORDS[0]);
 
   useEffect(() => {
-    const wordTimer = setInterval(() => setWord((prev) => pickWord(prev)), 2200);
+    const wordTimer = setInterval(() => setWord((prev) => pickWord(prev)), 3800);
 
     return () => clearInterval(wordTimer);
   }, []);
 
   return (
-    <div className={classNames('flex items-center gap-2 mt-4 select-none', className)}>
-      <img src="/etlaq-mark.svg" alt="" aria-hidden className="etlaq-mark-thinking w-4 h-4 shrink-0" />
+    <div className={classNames('flex items-center gap-2 mt-4 pl-1 select-none', className)}>
+      {/* The mark is a 4-point star that grows past its box while spinning, so keep a
+          little horizontal room (pl-1 + overflow-visible) to stop it clipping on the left. */}
+      <span className="inline-flex shrink-0 overflow-visible">
+        <img src="/etlaq-mark.svg" alt="" aria-hidden className="etlaq-mark-thinking w-4 h-4" />
+      </span>
       <span className="thinking-shimmer text-sm font-medium">{word}…</span>
     </div>
   );

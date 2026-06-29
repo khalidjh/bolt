@@ -14,6 +14,12 @@ export interface PreviewInfo {
   baseUrl: string;
 }
 
+/**
+ * Whether the preview is shown at a narrow "mobile" size (true) or full desktop width (false).
+ * Lifted out of the Preview component so the header's device-size switch can toggle it.
+ */
+export const previewDeviceModeStore = atom<boolean>(false);
+
 // Create a broadcast channel for preview updates
 const PREVIEW_CHANNEL = 'preview-updates';
 

@@ -30,10 +30,12 @@ import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import LlmErrorAlert from './LLMApiAlert';
 
-// Lazy-load the Workbench (terminal/editor/preview): it pulls in xterm, CodeMirror, Shiki,
-// html2canvas and the WebContainer client — several MB that the landing page never needs until
-// the user actually starts building. Keeping it out of the initial route graph is the single
-// biggest mobile-performance win.
+/*
+ * Lazy-load the Workbench (terminal/editor/preview): it pulls in xterm, CodeMirror, Shiki,
+ * html2canvas and the WebContainer client — several MB that the landing page never needs until
+ * the user actually starts building. Keeping it out of the initial route graph is the single
+ * biggest mobile-performance win.
+ */
 const importWorkbench = () =>
   import('~/components/workbench/Workbench.client').then((module) => ({ default: module.Workbench }));
 
@@ -139,7 +141,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       enhancePrompt,
       sendMessage,
       handleStop,
-      importChat,
       exportChat,
       uploadedFiles = [],
       setUploadedFiles,
@@ -420,7 +421,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             )}
             <StickToBottom
               className={classNames('pt-6 px-4 sm:px-6 relative', {
-                'h-full flex flex-col modern-scrollbar': chatStarted,
+                'h-full flex flex-col modern-scrollbar [scrollbar-gutter:stable_both-edges]': chatStarted,
               })}
               resize="smooth"
               initial="smooth"
@@ -433,6 +434,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         className="flex flex-col w-full flex-1 max-w-chat pb-4 mx-auto z-1"
                         messages={messages}
                         isStreaming={isStreaming}
+                        hasProgress={progressAnnotations.length > 0}
                         append={append}
                         chatMode={chatMode}
                         setChatMode={setChatMode}
@@ -546,7 +548,11 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
           <ClientOnly>
             {() => (
               <Suspense fallback={null}>
-                <Workbench chatStarted={chatStarted} isStreaming={isStreaming} setSelectedElement={setSelectedElement} />
+                <Workbench
+                  chatStarted={chatStarted}
+                  isStreaming={isStreaming}
+                  setSelectedElement={setSelectedElement}
+                />
               </Suspense>
             )}
           </ClientOnly>

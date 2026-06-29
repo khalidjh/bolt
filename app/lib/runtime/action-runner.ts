@@ -5,7 +5,8 @@ import type { ActionAlert, BoltAction, DeployAlert, FileHistory, SupabaseAction,
 import { createScopedLogger } from '~/utils/logger';
 import { unreachable } from '~/utils/unreachable';
 import type { ActionCallbackData } from './message-parser';
-import { cleanTerminalOutput, type BoltShell } from '~/utils/shell';
+import type { BoltShell } from '~/utils/shell';
+import { appendBootLog, bootLogs, clearBootLogs } from '~/lib/stores/bootLogs';
 
 const logger = createScopedLogger('ActionRunner');
 
@@ -182,9 +183,36 @@ export class ActionRunner {
 
     this.#updateAction(actionId, { status: 'running' });
 
+    /*
+     * Guard against an empty shell/start command (a model sometimes emits <boltAction type="shell">
+     * with no content). executeCommand would send a bare newline, and jsh shows a fresh prompt
+     * without emitting an `exit` OSC — so waitTillOscCode('exit') hangs forever, spinning this step
+     * and wedging the whole serialized action queue (including the dev-server fallback). Treat a
+     * blank command as a no-op so the queue keeps moving.
+     */
+    if ((action.type === 'shell' || action.type === 'start') && !action.content?.trim()) {
+      logger.debug(`Skipping empty ${action.type} command`);
+      this.#updateAction(actionId, { status: 'complete' });
+
+      return;
+    }
+
     try {
       switch (action.type) {
         case 'shell': {
+          /*
+           * A dev-server command emitted as a plain shell action (e.g. "npm install && npm run dev")
+           * never exits while the server is healthy, so awaiting it through #runShellAction would
+           * leave this step spinning forever (visible on mobile, hidden behind the preview on
+           * desktop). Launch it the same non-blocking way as a `start` action instead.
+           */
+          if (this.#isDevServerCommand(action.content)) {
+            this.#launchDevServer(actionId, action);
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+
+            return;
+          }
+
           await this.#runShellAction(action);
           break;
         }
@@ -215,41 +243,14 @@ export class ActionRunner {
           break;
         }
         case 'start': {
-          /*
-           * The dev server is detached and never resolves while healthy, so we don't await it here.
-           * It only settles if the server crashes/exits — handled by the catch below. We mark the
-           * action complete after a short launch delay (the live preview confirms it's actually up).
-           */
-          this.#runStartAction(action).catch((err: Error) => {
-            if (action.abortSignal.aborted) {
-              return;
-            }
-
-            this.#updateAction(actionId, { status: 'failed', error: 'Action failed' });
-            logger.error(`[${action.type}]:Action failed\n\n`, err);
-
-            if (!(err instanceof ActionCommandError)) {
-              return;
-            }
-
-            this.onAlert?.({
-              type: 'error',
-              title: 'Dev Server Failed',
-              description: err.header,
-              content: err.output,
-            });
-          });
+          // making the start app non blocking
+          this.#launchDevServer(actionId, action);
 
           /*
            * adding a delay to avoid any race condition between 2 start actions
            * i am up for a better approach
            */
           await new Promise((resolve) => setTimeout(resolve, 2000));
-
-          // only mark complete if the server didn't already crash (failed) or get aborted in that window
-          if (this.actions.get()[actionId]?.status === 'running') {
-            this.#updateAction(actionId, { status: 'complete' });
-          }
 
           return;
         }
@@ -280,6 +281,46 @@ export class ActionRunner {
       // re-throw the error to be caught in the promise chain
       throw error;
     }
+  }
+
+  /*
+   * Detect a long-running dev-server command so it can be launched non-blocking instead of awaited.
+   * Matches the dev command at the start of the line or after a `&&`/`;`/`|` separator, which covers
+   * the combined "npm install && npm run dev" form the model often emits as a single shell action.
+   */
+  #isDevServerCommand(content: string) {
+    return /(^|&&|;|\|)\s*(npm run dev|npm start|npm run start|yarn dev|yarn start|pnpm (run )?dev|pnpm start|bun (run )?dev|vite|next dev|remix vite:dev|astro dev|nuxt dev|ng serve|expo start)\b/i.test(
+      content,
+    );
+  }
+
+  /*
+   * Launch a dev server without blocking the action queue. #runStartAction installs deps if needed
+   * and starts the server detached; it resolves once the server is confirmed up (or rejects if it
+   * crashes), so the step flips to complete/failed instead of spinning on a never-exiting process.
+   */
+  #launchDevServer(actionId: string, action: ActionState) {
+    this.#runStartAction(action)
+      .then(() => this.#updateAction(actionId, { status: 'complete' }))
+      .catch((err: Error) => {
+        if (action.abortSignal.aborted) {
+          return;
+        }
+
+        this.#updateAction(actionId, { status: 'failed', error: 'Action failed' });
+        logger.error(`[${action.type}]:Action failed\n\n`, err);
+
+        if (!(err instanceof ActionCommandError)) {
+          return;
+        }
+
+        this.onAlert?.({
+          type: 'error',
+          title: 'Dev Server Failed',
+          description: err.header,
+          content: err.output,
+        });
+      });
   }
 
   async #runShellAction(action: ActionState) {
@@ -315,8 +356,8 @@ export class ActionRunner {
   }
 
   async #runStartAction(action: ActionState) {
-    if (action.type !== 'start') {
-      unreachable('Expected start action');
+    if (action.type !== 'start' && action.type !== 'shell') {
+      unreachable('Expected start or shell action');
     }
 
     if (!this.#shellTerminal) {
@@ -330,55 +371,90 @@ export class ActionRunner {
       unreachable('Shell terminal not found');
     }
 
+    clearBootLogs();
+
+    // Make sure dependencies are actually present before launching the dev server. The preceding
+    // install (setup shell action, or snapshot-restore setup) can fail or be interrupted — idle-
+    // timeout Ctrl-C, a transient WebContainer cache error, the user cancelling — leaving
+    // node_modules missing or partial, which makes `npm run dev` fail with "vite: command not
+    // found". Reinstall first so the preview boots reliably.
+    await this.#ensureDependenciesInstalled(shell);
+
     /*
-     * Run the dev server as a detached process rather than through executeCommand. This keeps it off
-     * the shared interactive/action shell, so subsequent shell and file actions are never blocked by
-     * (or accidentally kill) the long-running dev server.
+     * Launch the dev server as its OWN detached process (not through the interactive shell). A dev
+     * server on the interactive shell gets Ctrl-C'd by the next file-edit/shell action and wedges
+     * the serialized action queue. The detached process has no idle watchdog, so it survives going
+     * quiet once it's up. Output is mirrored to the terminal and into bootLogs for the preview view.
      */
-    let output = '';
-    const process = await shell.startDevServer(action.content, (data) => {
-      output += data;
+    const devProcess = await shell.startDevServer(action.content, appendBootLog);
 
-      // keep only a rolling tail so a chatty dev server doesn't grow this unbounded
-      if (output.length > 8192) {
-        output = output.slice(-8192);
-      }
-    });
-
-    if (!process) {
-      throw new ActionCommandError('Failed To Start Application', 'Dev server process could not be spawned');
-    }
-
-    // tie the action's lifecycle to the process so aborting the action stops the dev server
-    if (action.abortSignal.aborted) {
-      try {
-        process.kill();
-      } catch {
-        // already gone
-      }
-    } else {
-      action.abortSignal.addEventListener('abort', () => {
-        try {
-          process.kill();
-        } catch {
-          // already gone
-        }
-      });
+    if (!devProcess) {
+      throw new ActionCommandError('Failed To Start Application', 'Dev server process could not be spawned.');
     }
 
     /*
-     * A healthy dev server never exits, so this only resolves if it crashes or is stopped. The 2s
-     * delay in #executeAction lets a fast-failing server surface its error here before the action is
-     * marked complete.
+     * Detect an immediate crash (bad script, missing bin, port error) without blocking on the long-
+     * running server: race its exit against a short grace window. If it's still up after the grace
+     * period, treat the start as successful.
      */
-    const exitCode = await process.exit;
-    logger.debug(`${action.type} Dev Server exited: [exit code:${exitCode}]`);
+    const GRACE_MS = 8000;
+    const outcome = await Promise.race([
+      devProcess.exit.then((code) => ({ exited: true as const, code })),
+      new Promise<{ exited: false }>((resolve) => setTimeout(() => resolve({ exited: false }), GRACE_MS)),
+    ]);
 
-    if (exitCode !== 0 && !action.abortSignal.aborted) {
-      throw new ActionCommandError('Failed To Start Application', cleanTerminalOutput(output) || 'No Output Available');
+    if (outcome.exited && outcome.code !== 0) {
+      throw new ActionCommandError('Failed To Start Application', bootLogs.get() || 'No Output Available');
     }
 
-    return { output, exitCode };
+    return undefined;
+  }
+
+  /**
+   * Ensure node_modules is populated before the dev server starts. Treats deps as ready only when
+   * node_modules/.bin exists and is non-empty (that's where vite/next/etc. live), so a half-finished
+   * install is correctly detected as "not ready" and reinstalled. No-op for non-npm projects.
+   */
+  async #ensureDependenciesInstalled(shell: BoltShell) {
+    const webcontainer = await this.#webcontainer;
+
+    let hasPackageJson = false;
+
+    try {
+      await webcontainer.fs.readFile('package.json', 'utf-8');
+      hasPackageJson = true;
+    } catch {
+      hasPackageJson = false;
+    }
+
+    if (!hasPackageJson) {
+      return;
+    }
+
+    let depsReady = false;
+
+    try {
+      const bin = await webcontainer.fs.readdir('node_modules/.bin');
+      depsReady = bin.length > 0;
+    } catch {
+      depsReady = false;
+    }
+
+    if (depsReady) {
+      return;
+    }
+
+    logger.debug('Dependencies missing/incomplete before dev server start — installing first');
+    appendBootLog('\n[etlaq] Installing dependencies before starting the dev server…\n');
+
+    const resp = await shell.executeCommand(
+      this.runnerId.get(),
+      'npm install --no-audit --no-fund || (npm cache clean --force && npm install --no-audit --no-fund)',
+    );
+
+    if (resp?.exitCode !== 0) {
+      throw new ActionCommandError('Failed To Install Dependencies', resp?.output || 'No Output Available');
+    }
   }
 
   async #runFileAction(action: ActionState) {
@@ -654,10 +730,12 @@ export class ActionRunner {
   }> {
     const trimmedCommand = command.trim();
 
-    // Guard against unbalanced quotes. A malformed command with an unclosed " or ' (e.g. a token
-    // the model streamed badly, like `npm install --silent">`) leaves jsh sitting in quote-
-    // continuation mode (the `dquote>` prompt) forever, wedging the terminal and blocking every
-    // later action. Close the dangling quote so the command fails fast and recoverably instead.
+    /*
+     * Guard against unbalanced quotes. A malformed command with an unclosed " or ' (e.g. a token
+     * the model streamed badly, like `npm install --silent">`) leaves jsh sitting in quote-
+     * continuation mode (the `dquote>` prompt) forever, wedging the terminal and blocking every
+     * later action. Close the dangling quote so the command fails fast and recoverably instead.
+     */
     const unterminatedQuote = findUnterminatedQuote(trimmedCommand);
 
     if (unterminatedQuote) {
@@ -668,11 +746,13 @@ export class ActionRunner {
       };
     }
 
-    // Make npm installs resilient to WebContainer's transient in-browser npm cache corruption
-    // ("EIO: '<pkg>' not found in cache"). Retry once after clearing the cache so a single hiccup
-    // doesn't leave node_modules half-installed and break the preview. Only rewrites a command that
-    // *starts* with an install and isn't already carrying a retry/cache-clean (avoids double-wrapping
-    // the auto-generated setup commands, which build in their own retry).
+    /*
+     * Make npm installs resilient to WebContainer's transient in-browser npm cache corruption
+     * ("EIO: '<pkg>' not found in cache"). Retry once after clearing the cache so a single hiccup
+     * doesn't leave node_modules half-installed and break the preview. Only rewrites a command that
+     * *starts* with an install and isn't already carrying a retry/cache-clean (avoids double-wrapping
+     * the auto-generated setup commands, which build in their own retry).
+     */
     if (!trimmedCommand.includes('cache clean')) {
       const installMatch = trimmedCommand.match(/^(npm\s+(?:install|i|ci)\b[^&|;]*?)(\s*(?:&&|\|\||;)[\s\S]*)?$/);
 

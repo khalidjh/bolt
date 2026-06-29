@@ -12,19 +12,21 @@ import {
   type OnChangeCallback as OnEditorChange,
   type OnScrollCallback as OnEditorScroll,
 } from '~/components/editor/codemirror/CodeMirrorEditor';
-import { Slider, type SliderOptions } from '~/components/ui/Slider';
 import { workbenchStore, type WorkbenchViewType } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { cubicEasingFn } from '~/utils/easings';
 import { renderLogger } from '~/utils/logger';
 import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
+import { PreviewBar } from './PreviewBar';
+import { DevServerLogs } from './DevServerLogs';
+import { ShareSheet } from '~/components/share/ShareSheet';
+import { PublishSheet } from '~/components/share/PublishSheet';
 import useViewport from '~/lib/hooks';
 
 import { usePreviewStore } from '~/lib/stores/previews';
 import type { ElementInfo } from './Inspector';
 import { ExportChatButton } from '~/components/chat/chatExportAndImport/ExportChatButton';
-import { DeployButton } from '~/components/deploy/DeployButton';
 import { useChatHistory } from '~/lib/persistence';
 import { streamingState } from '~/lib/stores/streaming';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -40,21 +42,6 @@ interface WorkspaceProps {
 }
 
 const viewTransition = { ease: cubicEasingFn };
-
-const sliderOptions: SliderOptions<WorkbenchViewType> = {
-  left: {
-    value: 'code',
-    text: 'Code',
-  },
-  middle: {
-    value: 'diff',
-    text: 'Diff',
-  },
-  right: {
-    value: 'preview',
-    text: 'Preview',
-  },
-};
 
 const workbenchVariants = {
   closed: {
@@ -379,120 +366,149 @@ export const Workbench = memo(
         >
           <div
             className={classNames(
-              'fixed top-[calc(var(--header-height)+0.5rem)] bottom-6 w-[var(--workbench-inner-width)] z-0 transition-[left,width] duration-200 bolt-ease-cubic-bezier',
+              'fixed w-[var(--workbench-inner-width)] z-0 transition-[left,width] duration-200 bolt-ease-cubic-bezier',
               {
                 'w-full': isSmallViewport,
                 'left-0': showWorkbench && isSmallViewport,
                 'left-[var(--workbench-left)]': showWorkbench,
                 'left-[100%]': !showWorkbench,
+
+                /*
+                 * Mobile: the header is hidden while the workbench is open, so go near-fullscreen
+                 * and leave room at the bottom for the floating preview bar.
+                 */
+                'top-2 bottom-[4.75rem]': isSmallViewport,
+                'top-[calc(var(--header-height)+0.5rem)] bottom-6': !isSmallViewport,
               },
             )}
           >
-            <div className="absolute inset-0 px-2 lg:px-4">
-              <div className="h-full flex flex-col bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor shadow-sm rounded-lg overflow-hidden">
-                <div className="flex items-center px-3 py-2 border-b border-bolt-elements-borderColor gap-1.5">
-                  <Slider selected={selectedView} options={sliderOptions} setSelected={setSelectedView} />
-                  <div className="ml-auto" />
-                  {selectedView === 'code' && (
-                    <div className="flex items-center overflow-x-auto">
-                      {/* Export Chat Button */}
-                      <ExportChatButton exportChat={exportChat} />
+            <div className={classNames('absolute inset-0', { 'px-2 lg:px-4': !isSmallViewport })}>
+              <div
+                className={classNames('h-full flex flex-col bg-bolt-elements-background-depth-2 overflow-hidden', {
+                  'border border-bolt-elements-borderColor shadow-sm rounded-lg': !isSmallViewport,
+                })}
+              >
+                {/* Mobile: a clean, preview-only experience — no Code/Diff slider, Files or terminal.
+                    While the dev server is still booting (no preview yet) show its logs instead of a
+                    blank wait, so install progress and errors are visible. */}
+                {isSmallViewport ? (
+                  hasPreview ? (
+                    <Preview setSelectedElement={setSelectedElement} hideToolbar />
+                  ) : (
+                    <DevServerLogs />
+                  )
+                ) : (
+                  <>
+                    {/* The view switcher now lives in the top header bar; the panel only keeps the
+                        Code/Diff action toolbar, and the preview fills the panel with no chrome. */}
+                    {selectedView !== 'preview' && (
+                      <div className="flex items-center justify-end px-3 py-2 border-b border-bolt-elements-borderColor gap-1.5">
+                        {selectedView === 'code' && (
+                          <div className="flex items-center overflow-x-auto">
+                            {/* Export Chat Button */}
+                            <ExportChatButton exportChat={exportChat} />
 
-                      {/* Sync Button */}
-                      <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden ml-1">
-                        <DropdownMenu.Root>
-                          <DropdownMenu.Trigger
-                            disabled={isSyncing || streaming}
-                            className="rounded-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-accent-500 text-white hover:text-bolt-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-bolt-elements-button-primary-backgroundHover outline-accent-500 flex items-center gap-1.7"
-                          >
-                            <span className={isSyncing ? 'i-ph:spinner animate-spin' : 'i-ph:cloud-arrow-down'} />
-                            <span className="hidden lg:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-                            <span className={classNames('i-ph:caret-down transition-transform hidden lg:inline')} />
-                          </DropdownMenu.Trigger>
-                          <DropdownMenu.Content
-                            className={classNames(
-                              'min-w-[240px] z-[250]',
-                              'bg-white dark:bg-[#141414]',
-                              'rounded-lg shadow-lg',
-                              'border border-gray-200/50 dark:border-gray-800/50',
-                              'animate-in fade-in-0 zoom-in-95',
-                              'py-1',
-                            )}
-                            sideOffset={5}
-                            align="end"
-                          >
-                            <DropdownMenu.Item
-                              className={classNames(
-                                'cursor-pointer flex items-center w-full px-4 py-2 text-sm text-bolt-elements-textPrimary hover:bg-bolt-elements-item-backgroundActive gap-2 rounded-md group relative',
-                              )}
-                              onClick={handleSyncFiles}
-                              disabled={isSyncing}
-                            >
-                              <div className="flex items-center gap-2">
-                                {isSyncing ? (
-                                  <div className="i-ph:spinner" />
-                                ) : (
-                                  <div className="i-ph:cloud-arrow-down" />
-                                )}
-                                <span>{isSyncing ? 'Syncing...' : 'Sync Files'}</span>
-                              </div>
-                            </DropdownMenu.Item>
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Root>
-                      </div>
+                            {/* Sync Button */}
+                            <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden ml-1">
+                              <DropdownMenu.Root>
+                                <DropdownMenu.Trigger
+                                  disabled={isSyncing || streaming}
+                                  className="rounded-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-accent-500 text-white hover:text-bolt-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-bolt-elements-button-primary-backgroundHover outline-accent-500 flex items-center gap-1.7"
+                                >
+                                  <span className={isSyncing ? 'i-ph:spinner animate-spin' : 'i-ph:cloud-arrow-down'} />
+                                  <span className="hidden lg:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+                                  <span
+                                    className={classNames('i-ph:caret-down transition-transform hidden lg:inline')}
+                                  />
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Content
+                                  className={classNames(
+                                    'min-w-[240px] z-[250]',
+                                    'bg-white dark:bg-[#141414]',
+                                    'rounded-lg shadow-lg',
+                                    'border border-gray-200/50 dark:border-gray-800/50',
+                                    'animate-in fade-in-0 zoom-in-95',
+                                    'py-1',
+                                  )}
+                                  sideOffset={5}
+                                  align="end"
+                                >
+                                  <DropdownMenu.Item
+                                    className={classNames(
+                                      'cursor-pointer flex items-center w-full px-4 py-2 text-sm text-bolt-elements-textPrimary hover:bg-bolt-elements-item-backgroundActive gap-2 rounded-md group relative',
+                                    )}
+                                    onClick={handleSyncFiles}
+                                    disabled={isSyncing}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {isSyncing ? (
+                                        <div className="i-ph:spinner" />
+                                      ) : (
+                                        <div className="i-ph:cloud-arrow-down" />
+                                      )}
+                                      <span>{isSyncing ? 'Syncing...' : 'Sync Files'}</span>
+                                    </div>
+                                  </DropdownMenu.Item>
+                                </DropdownMenu.Content>
+                              </DropdownMenu.Root>
+                            </div>
 
-                      {/* Toggle Terminal Button */}
-                      <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden ml-1">
-                        <button
-                          onClick={() => {
-                            workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get());
-                          }}
-                          className="rounded-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-accent-500 text-white hover:text-bolt-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-bolt-elements-button-primary-backgroundHover outline-accent-500 flex items-center gap-1.7"
-                        >
-                          <div className="i-ph:terminal" />
-                          <span className="hidden lg:inline">Toggle Terminal</span>
-                        </button>
+                            {/* Toggle Terminal Button */}
+                            <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden ml-1">
+                              <button
+                                onClick={() => {
+                                  workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get());
+                                }}
+                                className="rounded-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-accent-500 text-white hover:text-bolt-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-bolt-elements-button-primary-backgroundHover outline-accent-500 flex items-center gap-1.7"
+                              >
+                                <div className="i-ph:terminal" />
+                                <span className="hidden lg:inline">Toggle Terminal</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedView === 'diff' && (
+                          <FileModifiedDropdown fileHistory={fileHistory} onSelectFile={handleSelectFile} />
+                        )}
                       </div>
+                    )}
+                    <div className="relative flex-1 overflow-hidden">
+                      <View initial={{ x: '0%' }} animate={{ x: selectedView === 'code' ? '0%' : '-100%' }}>
+                        <EditorPanel
+                          editorDocument={currentDocument}
+                          isStreaming={isStreaming}
+                          selectedFile={selectedFile}
+                          files={files}
+                          unsavedFiles={unsavedFiles}
+                          fileHistory={fileHistory}
+                          onFileSelect={onFileSelect}
+                          onEditorScroll={onEditorScroll}
+                          onEditorChange={onEditorChange}
+                          onFileSave={onFileSave}
+                          onFileReset={onFileReset}
+                        />
+                      </View>
+                      <View
+                        initial={{ x: '100%' }}
+                        animate={{ x: selectedView === 'diff' ? '0%' : selectedView === 'code' ? '100%' : '-100%' }}
+                      >
+                        <DiffView fileHistory={fileHistory} setFileHistory={setFileHistory} />
+                      </View>
+                      <View initial={{ x: '100%' }} animate={{ x: selectedView === 'preview' ? '0%' : '100%' }}>
+                        <Preview setSelectedElement={setSelectedElement} hideToolbar />
+                      </View>
                     </div>
-                  )}
-
-                  {selectedView === 'diff' && (
-                    <FileModifiedDropdown fileHistory={fileHistory} onSelectFile={handleSelectFile} />
-                  )}
-
-                  {/* The header already shows a Deploy button on `lg` screens; only surface this one
-                      below `lg`, where the header hides its action buttons. */}
-                  {selectedView === 'preview' && <DeployButton className="lg:hidden" />}
-                </div>
-                <div className="relative flex-1 overflow-hidden">
-                  <View initial={{ x: '0%' }} animate={{ x: selectedView === 'code' ? '0%' : '-100%' }}>
-                    <EditorPanel
-                      editorDocument={currentDocument}
-                      isStreaming={isStreaming}
-                      selectedFile={selectedFile}
-                      files={files}
-                      unsavedFiles={unsavedFiles}
-                      fileHistory={fileHistory}
-                      onFileSelect={onFileSelect}
-                      onEditorScroll={onEditorScroll}
-                      onEditorChange={onEditorChange}
-                      onFileSave={onFileSave}
-                      onFileReset={onFileReset}
-                    />
-                  </View>
-                  <View
-                    initial={{ x: '100%' }}
-                    animate={{ x: selectedView === 'diff' ? '0%' : selectedView === 'code' ? '100%' : '-100%' }}
-                  >
-                    <DiffView fileHistory={fileHistory} setFileHistory={setFileHistory} />
-                  </View>
-                  <View initial={{ x: '100%' }} animate={{ x: selectedView === 'preview' ? '0%' : '100%' }}>
-                    <Preview setSelectedElement={setSelectedElement} />
-                  </View>
-                </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Mobile preview-first controls + the Share / Publish bottom sheets. */}
+          {showWorkbench && <PreviewBar />}
+          <ShareSheet exportChat={exportChat} />
+          <PublishSheet />
         </motion.div>
       )
     );

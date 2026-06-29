@@ -310,12 +310,57 @@ export class BoltShell {
     this.#devProcess = process;
 
     const terminal = this.#terminal;
+
+    /*
+     * esbuild (used by Vite) dumps a Go panic — "fatal error: too many writes on closed pipe"
+     * followed by a long goroutine stack trace — whenever its process is killed mid-write, which
+     * happens every time the dev server is restarted. It's harmless noise. A Go `fatal error` always
+     * terminates the process, so once we see the marker on this process's stream we suppress the rest
+     * of its output. We hold back a small tail each chunk so the marker is still caught if it's split
+     * across two chunks, and flush that tail when the stream closes so the final line isn't truncated.
+     */
+    const PANIC_MARKER = 'fatal error: too many writes on closed pipe';
+    let suppressed = false;
+    let tail = '';
+
+    const filterPanic = (data: string): string => {
+      if (suppressed) {
+        return '';
+      }
+
+      const combined = tail + data;
+      const markerIndex = combined.indexOf(PANIC_MARKER);
+
+      if (markerIndex !== -1) {
+        suppressed = true;
+        tail = '';
+
+        return combined.slice(0, markerIndex);
+      }
+
+      // Hold back the last (marker length - 1) chars in case the marker straddles this chunk boundary.
+      const keep = Math.max(0, combined.length - (PANIC_MARKER.length - 1));
+      tail = combined.slice(keep);
+
+      return combined.slice(0, keep);
+    };
+
     process.output
       .pipeTo(
         new WritableStream({
           write(data) {
-            terminal.write(data);
-            onOutput?.(data);
+            const filtered = filterPanic(data);
+
+            if (filtered) {
+              terminal.write(filtered);
+              onOutput?.(filtered);
+            }
+          },
+          close() {
+            if (!suppressed && tail) {
+              terminal.write(tail);
+              onOutput?.(tail);
+            }
           },
         }),
       )

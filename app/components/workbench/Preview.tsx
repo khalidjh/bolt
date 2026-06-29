@@ -5,13 +5,21 @@ import { workbenchStore } from '~/lib/stores/workbench';
 import { PortDropdown } from './PortDropdown';
 import { ScreenshotSelector } from './ScreenshotSelector';
 import { expoUrlAtom } from '~/lib/stores/qrCodeStore';
+import { previewDeviceModeStore } from '~/lib/stores/previews';
 import { ExpoQrModal } from '~/components/workbench/ExpoQrModal';
 import type { ElementInfo } from './Inspector';
+import { classNames } from '~/utils/classNames';
 
 type ResizeSide = 'left' | 'right' | null;
 
 interface PreviewProps {
   setSelectedElement?: (element: ElementInfo | null) => void;
+
+  /**
+   * Hide the preview's own toolbar (URL bar, device/inspector controls) — used for the clean,
+   *  preview-only mobile experience where the floating bar provides the controls instead.
+   */
+  hideToolbar?: boolean;
 }
 
 interface WindowSize {
@@ -52,7 +60,7 @@ const WINDOW_SIZES: WindowSize[] = [
   { name: '4K Display', width: 3840, height: 2160, icon: 'i-ph:monitor', hasFrame: true, frameType: 'desktop' },
 ];
 
-export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
+export const Preview = memo(({ setSelectedElement, hideToolbar = false }: PreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,7 +74,7 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
   const [iframeUrl, setIframeUrl] = useState<string | undefined>();
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isInspectorMode, setIsInspectorMode] = useState(false);
-  const [isDeviceModeOn, setIsDeviceModeOn] = useState(false);
+  const isDeviceModeOn = useStore(previewDeviceModeStore);
   const [widthPercent, setWidthPercent] = useState<number>(37.5);
   const [currentWidth, setCurrentWidth] = useState<number>(0);
 
@@ -144,7 +152,7 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
   }, []);
 
   const toggleDeviceMode = () => {
-    setIsDeviceModeOn((prev) => !prev);
+    previewDeviceModeStore.set(!previewDeviceModeStore.get());
   };
 
   const startResizing = (e: React.PointerEvent, side: ResizeSide) => {
@@ -665,7 +673,10 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
       {isPortDropdownOpen && (
         <div className="z-iframe-overlay w-full h-full absolute" onClick={() => setIsPortDropdownOpen(false)} />
       )}
-      <div className="bg-bolt-elements-background-depth-2 p-2 flex items-center gap-2">
+      {!hideToolbar && (
+      <div
+        className={classNames('bg-bolt-elements-background-depth-2 p-2 flex items-center gap-2')}
+      >
         <div className="flex items-center gap-2">
           <IconButton icon="i-ph:arrow-clockwise" onClick={reloadPreview} />
           <IconButton
@@ -896,6 +907,7 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
           </div>
         </div>
       </div>
+      )}
 
       <div className="flex-1 border-t border-bolt-elements-borderColor flex justify-center items-center overflow-auto">
         <div

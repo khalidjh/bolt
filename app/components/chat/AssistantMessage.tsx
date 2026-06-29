@@ -1,5 +1,6 @@
-import { memo, Fragment } from 'react';
+import { memo, Fragment, useState } from 'react';
 import { Markdown } from './Markdown';
+import { classNames } from '~/utils/classNames';
 import type { JSONValue } from 'ai';
 import Popover from '~/components/ui/Popover';
 import { workbenchStore } from '~/lib/stores/workbench';
@@ -102,80 +103,66 @@ export const AssistantMessage = memo(
       (annotation) => annotation.type === 'toolCall',
     ) as ToolCallAnnotation[];
 
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+      // Strip the artifact/action markup so only the human-readable reply lands on the clipboard.
+      const text = content
+        .replace(/<boltArtifact[\s\S]*?<\/boltArtifact>/g, '')
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .trim();
+      navigator.clipboard.writeText(text).then(
+        () => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        },
+        () => setCopied(false),
+      );
+    };
+
     return (
       <div className="overflow-hidden w-full">
-        <>
-          <div className=" flex gap-2 items-center text-sm text-bolt-elements-textSecondary mb-2">
-            {(codeContext || chatSummary) && (
-              <Popover side="right" align="start" trigger={<div className="i-ph:info" />}>
-                {chatSummary && (
-                  <div className="max-w-chat">
-                    <div className="summary max-h-96 flex flex-col">
-                      <h2 className="border border-bolt-elements-borderColor rounded-md p4">Summary</h2>
-                      <div style={{ zoom: 0.7 }} className="overflow-y-auto m4">
-                        <Markdown>{chatSummary}</Markdown>
+        {(codeContext || chatSummary) && (
+          <div className="flex gap-2 items-center text-sm text-bolt-elements-textSecondary mb-2">
+            <Popover side="right" align="start" trigger={<div className="i-ph:info" />}>
+              {chatSummary && (
+                <div className="max-w-chat">
+                  <div className="summary max-h-96 flex flex-col">
+                    <h2 className="border border-bolt-elements-borderColor rounded-md p4">Summary</h2>
+                    <div style={{ zoom: 0.7 }} className="overflow-y-auto m4">
+                      <Markdown>{chatSummary}</Markdown>
+                    </div>
+                  </div>
+                  {codeContext && (
+                    <div className="code-context flex flex-col p4 border border-bolt-elements-borderColor rounded-md">
+                      <h2>Context</h2>
+                      <div className="flex gap-4 mt-4 bolt" style={{ zoom: 0.6 }}>
+                        {codeContext.map((x) => {
+                          const normalized = normalizedFilePath(x);
+                          return (
+                            <Fragment key={normalized}>
+                              <code
+                                className="bg-bolt-elements-artifacts-inlineCode-background text-bolt-elements-artifacts-inlineCode-text px-1.5 py-1 rounded-md text-bolt-elements-item-contentAccent hover:underline cursor-pointer"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openArtifactInWorkbench(normalized);
+                                }}
+                              >
+                                {normalized}
+                              </code>
+                            </Fragment>
+                          );
+                        })}
                       </div>
                     </div>
-                    {codeContext && (
-                      <div className="code-context flex flex-col p4 border border-bolt-elements-borderColor rounded-md">
-                        <h2>Context</h2>
-                        <div className="flex gap-4 mt-4 bolt" style={{ zoom: 0.6 }}>
-                          {codeContext.map((x) => {
-                            const normalized = normalizedFilePath(x);
-                            return (
-                              <Fragment key={normalized}>
-                                <code
-                                  className="bg-bolt-elements-artifacts-inlineCode-background text-bolt-elements-artifacts-inlineCode-text px-1.5 py-1 rounded-md text-bolt-elements-item-contentAccent hover:underline cursor-pointer"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openArtifactInWorkbench(normalized);
-                                  }}
-                                >
-                                  {normalized}
-                                </code>
-                              </Fragment>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="context"></div>
-              </Popover>
-            )}
-            <div className="flex w-full items-center justify-between">
-              {usage && (
-                <div>
-                  Tokens: {usage.totalTokens} (prompt: {usage.promptTokens}, completion: {usage.completionTokens})
-                </div>
-              )}
-              {(onRewind || onFork) && messageId && (
-                <div className="flex gap-2 flex-col lg:flex-row ml-auto">
-                  {onRewind && (
-                    <WithTooltip tooltip="Revert to this message">
-                      <button
-                        onClick={() => onRewind(messageId)}
-                        key="i-ph:arrow-u-up-left"
-                        className="i-ph:arrow-u-up-left text-xl text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors"
-                      />
-                    </WithTooltip>
-                  )}
-                  {onFork && (
-                    <WithTooltip tooltip="Fork chat from this message">
-                      <button
-                        onClick={() => onFork(messageId)}
-                        key="i-ph:git-fork"
-                        className="i-ph:git-fork text-xl text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors"
-                      />
-                    </WithTooltip>
                   )}
                 </div>
               )}
-            </div>
+              <div className="context"></div>
+            </Popover>
           </div>
-        </>
+        )}
         <Markdown append={append} chatMode={chatMode} setChatMode={setChatMode} model={model} provider={provider} html>
           {content}
         </Markdown>
@@ -186,7 +173,58 @@ export const AssistantMessage = memo(
             addToolResult={addToolResult}
           />
         )}
+        {messageId && content && content.trim() !== '' && (
+          <div className="flex items-center gap-3.5 mt-3 text-bolt-elements-textSecondary">
+            <ActionButton
+              tooltip={copied ? 'Copied!' : 'Copy'}
+              icon={copied ? 'i-ph:check-bold' : 'i-ph:copy'}
+              onClick={handleCopy}
+            />
+            {onRewind && messageId && (
+              <ActionButton
+                tooltip="Revert to this message"
+                icon="i-ph:arrow-u-up-left"
+                onClick={() => onRewind(messageId)}
+              />
+            )}
+            {onFork && messageId && (
+              <ActionButton
+                tooltip="Fork chat from this message"
+                icon="i-ph:git-fork"
+                onClick={() => onFork(messageId)}
+              />
+            )}
+            {usage && (
+              <WithTooltip
+                tooltip={`${usage.totalTokens} tokens (prompt ${usage.promptTokens}, completion ${usage.completionTokens})`}
+              >
+                <div className="i-ph:coins text-base opacity-60" />
+              </WithTooltip>
+            )}
+          </div>
+        )}
       </div>
     );
   },
 );
+
+interface ActionButtonProps {
+  tooltip: string;
+  icon: string;
+  onClick: () => void;
+}
+
+function ActionButton({ tooltip, icon, onClick }: ActionButtonProps) {
+  return (
+    <WithTooltip tooltip={tooltip}>
+      <button
+        onClick={onClick}
+        aria-label={tooltip}
+        className={classNames(
+          icon,
+          'text-lg text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors',
+        )}
+      />
+    </WithTooltip>
+  );
+}
