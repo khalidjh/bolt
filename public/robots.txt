@@ -1,0 +1,9 @@
+# https://etlaq.sa
+User-agent: *
+Allow: /
+Disallow: /chat/
+Disallow: /git
+Disallow: /api/
+Disallow: /webcontainer/
+
+Sitemap: https://etlaq.sa/sitemap.xml

@@ -1,0 +1,27 @@
+{
+  "name": "Etlaq | إطلاق",
+  "short_name": "Etlaq",
+  "description": "Empower founders to build, launch, and scale tech products without technical knowledge. From idea to project in minutes — no coding required.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "developer", "business"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "maskable"
+    }
+  ]
+}
