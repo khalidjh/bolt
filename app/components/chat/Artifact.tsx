@@ -91,36 +91,38 @@ export const Artifact = memo(({ artifactId }: ArtifactProps) => {
     <>
       <div className="artifact border border-bolt-elements-borderColor flex flex-col overflow-hidden rounded-xl shadow-sm w-full transition-all duration-150 hover:border-bolt-elements-borderColorActive">
         <div className="flex">
-          <button
-            className="flex items-stretch bg-bolt-elements-artifacts-background hover:bg-bolt-elements-artifacts-backgroundHover w-full overflow-hidden"
-            onClick={() => {
-              const showWorkbench = workbenchStore.showWorkbench.get();
-              workbenchStore.showWorkbench.set(!showWorkbench);
-            }}
-          >
+          <div className="flex items-stretch bg-bolt-elements-artifacts-background w-full overflow-hidden">
             <div className="px-5 p-3.5 w-full text-left">
               <div className="w-full text-bolt-elements-textPrimary font-medium leading-5 text-sm">
                 {/* Use the dynamic title here */}
                 {dynamicTitle}
               </div>
-              <div className="w-full w-full text-bolt-elements-textSecondary text-xs mt-0.5">
-                Click to open Workbench
-              </div>
             </div>
-          </button>
-          {artifact.type !== 'bundled' && <div className="bg-bolt-elements-artifacts-borderColor w-[1px]" />}
+          </div>
+          {artifact.type !== 'bundled' && (hasPreview || actions.length > 0) && (
+            <div className="bg-bolt-elements-artifacts-borderColor w-[1px]" />
+          )}
           <AnimatePresence>
-            {actions.length && artifact.type !== 'bundled' && (
+            {(hasPreview || actions.length > 0) && artifact.type !== 'bundled' && (
               <motion.button
                 initial={{ width: 0 }}
                 animate={{ width: 'auto' }}
                 exit={{ width: 0 }}
                 transition={{ duration: 0.15, ease: cubicEasingFn }}
                 className="bg-bolt-elements-artifacts-background hover:bg-bolt-elements-artifacts-backgroundHover"
-                onClick={toggleActions}
+                onClick={hasPreview ? openPreview : toggleActions}
+                title={hasPreview ? 'Open preview' : 'Toggle actions'}
               >
                 <div className="p-4">
-                  <div className={showActions ? 'i-ph:caret-up-bold' : 'i-ph:caret-down-bold'}></div>
+                  <div
+                    className={
+                      hasPreview
+                        ? 'i-ph:play-fill text-bolt-elements-item-contentAccent'
+                        : showActions
+                          ? 'i-ph:caret-up-bold'
+                          : 'i-ph:caret-down-bold'
+                    }
+                  ></div>
                 </div>
               </motion.button>
             )}
@@ -162,15 +164,6 @@ export const Artifact = memo(({ artifactId }: ArtifactProps) => {
             </motion.div>
           )}
         </AnimatePresence>
-        {hasPreview && (
-          <button
-            onClick={openPreview}
-            className="flex items-center justify-center gap-1.5 w-full px-5 py-3 text-sm font-medium border-t border-bolt-elements-borderColor bg-bolt-elements-artifacts-background hover:bg-bolt-elements-artifacts-backgroundHover text-bolt-elements-item-contentAccent transition-colors"
-          >
-            <span className="i-ph:eye text-base" />
-            Preview
-          </button>
-        )}
       </div>
     </>
   );
