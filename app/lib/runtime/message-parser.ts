@@ -139,12 +139,41 @@ export class StreamingMessageParser {
         }
 
         if (state.insideAction) {
-          const closeIndex = input.indexOf(ARTIFACT_ACTION_TAG_CLOSE, i);
-
           const currentAction = state.currentAction;
 
-          if (closeIndex !== -1) {
-            currentAction.content += input.slice(i, closeIndex);
+          const closeIndex = input.indexOf(ARTIFACT_ACTION_TAG_CLOSE, i);
+
+          /*
+           * A well-formed action is terminated by </boltAction>. When a model omits that close tag,
+           * the next <boltAction ...> open — or the artifact's </boltArtifact> close — is where this
+           * action actually ends. Without treating those as implicit boundaries, an unclosed shell
+           * action swallows the following `start` action's tag as its own content, so `npm run dev`
+           * never runs as a real start action and the preview never becomes ready.
+           */
+          const isFileAction = 'type' in currentAction && currentAction.type === 'file';
+
+          /*
+           * Only treat a following <boltAction ...> open as an implicit boundary for non-file
+           * actions: shell/start command bodies never contain a literal bolt tag, whereas a file's
+           * content legitimately might, and truncating a file there would corrupt it. The artifact
+           * close is an implicit boundary for every action type (a file missing its close before
+           * </boltArtifact> should still terminate rather than hang the parser forever).
+           */
+          const nextOpenIndex = isFileAction ? -1 : input.indexOf(ARTIFACT_ACTION_TAG_OPEN, i);
+          const artifactCloseIndex = input.indexOf(ARTIFACT_TAG_CLOSE, i);
+
+          let boundaryIndex = closeIndex;
+          let consumeCloseTag = closeIndex !== -1;
+
+          for (const implicitBoundary of [nextOpenIndex, artifactCloseIndex]) {
+            if (implicitBoundary !== -1 && (boundaryIndex === -1 || implicitBoundary < boundaryIndex)) {
+              boundaryIndex = implicitBoundary;
+              consumeCloseTag = false;
+            }
+          }
+
+          if (boundaryIndex !== -1) {
+            currentAction.content += input.slice(i, boundaryIndex);
 
             let content = currentAction.content.trim();
 
@@ -177,7 +206,7 @@ export class StreamingMessageParser {
             state.insideAction = false;
             state.currentAction = { content: '' };
 
-            i = closeIndex + ARTIFACT_ACTION_TAG_CLOSE.length;
+            i = consumeCloseTag ? boundaryIndex + ARTIFACT_ACTION_TAG_CLOSE.length : boundaryIndex;
           } else {
             if ('type' in currentAction && currentAction.type === 'file') {
               let content = input.slice(i);

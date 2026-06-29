@@ -157,6 +157,54 @@ describe('StreamingMessageParser', () => {
       runTest(input, expected);
     });
   });
+
+  describe('actions with a missing close tag', () => {
+    it('recovers the following action when a shell action omits </boltAction>', () => {
+      const closedActions: Array<{ type?: string; content?: string }> = [];
+      const parser = new StreamingMessageParser({
+        artifactElement: () => '',
+        callbacks: {
+          onActionClose: (data) => {
+            closedActions.push({ type: (data.action as any).type, content: data.action.content });
+          },
+        },
+      });
+
+      // The shell action never emits its </boltAction>; the start action's open tag must end it
+      // so `npm run dev` is parsed as a real start action instead of being swallowed as content.
+      const input =
+        '<boltArtifact title="t" id="a">' +
+        '<boltAction type="shell">npm install' +
+        '<boltAction type="start">npm run dev</boltAction>' +
+        '</boltArtifact>';
+
+      parser.parse('missing_close', input);
+
+      expect(closedActions).toEqual([
+        { type: 'shell', content: 'npm install' },
+        { type: 'start', content: 'npm run dev' },
+      ]);
+    });
+
+    it('closes a final action that omits </boltAction> at the artifact close', () => {
+      const closedActions: Array<{ type?: string; content?: string }> = [];
+      const parser = new StreamingMessageParser({
+        artifactElement: () => '',
+        callbacks: {
+          onActionClose: (data) => {
+            closedActions.push({ type: (data.action as any).type, content: data.action.content });
+          },
+        },
+      });
+
+      const input =
+        '<boltArtifact title="t" id="a"><boltAction type="start">npm run dev</boltArtifact>';
+
+      parser.parse('missing_close_final', input);
+
+      expect(closedActions).toEqual([{ type: 'start', content: 'npm run dev' }]);
+    });
+  });
 });
 
 describe('EnhancedStreamingMessageParser', () => {
