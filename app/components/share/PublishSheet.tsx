@@ -21,17 +21,30 @@ export function PublishSheet() {
   const { handleNetlifyDeploy } = useNetlifyDeploy();
   const [isDeploying, setIsDeploying] = useState(false);
 
+  // The URL returned by the most recent deploy. Persisted per-chat so reopening the sheet (or a
+  // page reload) still shows the live link — and so operator-default deploys, whose URL can't be
+  // re-derived from account stats, surface a link at all.
+  const [publishedUrl, setPublishedUrl] = useState<string | undefined>();
+
   const netlifyAvailable = !!connection.user || operatorDefault;
 
-  // Refresh the site list when the sheet opens so we can surface an existing URL.
+  // Restore any previously published URL for this chat, and refresh the site list (connected
+  // accounts only) so an existing URL surfaces even before the first publish in this session.
   useEffect(() => {
-    if (open && connection.token && currentChatId) {
+    if (!open || !currentChatId) {
+      return;
+    }
+
+    const stored = localStorage.getItem(`netlify-url-${currentChatId}`) || undefined;
+    setPublishedUrl(stored);
+
+    if (connection.token) {
       fetchNetlifyStats(connection.token);
     }
   }, [open, connection.token, currentChatId]);
 
   const deployedSite = connection.stats?.sites?.find((site) => site.name.includes(`bolt-diy-${currentChatId}`));
-  const websiteUrl = deployedSite?.url;
+  const websiteUrl = publishedUrl ?? deployedSite?.url;
   const hostname = websiteUrl ? websiteUrl.replace(/^https?:\/\//, '') : undefined;
 
   const canDeploy = netlifyAvailable && !!activePreview && !isStreaming && !isDeploying;
@@ -40,7 +53,15 @@ export function PublishSheet() {
     setIsDeploying(true);
 
     try {
-      await handleNetlifyDeploy();
+      const url = await handleNetlifyDeploy();
+
+      if (url) {
+        setPublishedUrl(url);
+
+        if (currentChatId) {
+          localStorage.setItem(`netlify-url-${currentChatId}`, url);
+        }
+      }
 
       if (connection.token) {
         await fetchNetlifyStats(connection.token);
@@ -122,8 +143,13 @@ export function PublishSheet() {
         disabled={!canDeploy}
         className={classNames(
           'mt-5 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors',
-          'bg-accent-500 text-white hover:bg-bolt-elements-button-primary-backgroundHover',
-          '[&:is(:disabled,.disabled)]:opacity-50 [&:is(:disabled,.disabled)]:cursor-not-allowed',
+          'bg-accent-500 text-white hover:bg-accent-600',
+          {
+            // Keep the busy state at full contrast so "Publishing…" stays readable; only dim the
+            // button when it's genuinely unavailable (not connected / no preview / streaming).
+            'cursor-wait': isDeploying,
+            'opacity-50 cursor-not-allowed': !canDeploy && !isDeploying,
+          },
         )}
       >
         {isDeploying ? (

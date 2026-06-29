@@ -21,12 +21,12 @@ export function useNetlifyDeploy() {
   const handleNetlifyDeploy = async () => {
     if (!canDeploy) {
       toast.error('Please connect to Netlify first in the settings tab!');
-      return false;
+      return undefined;
     }
 
     if (!currentChatId) {
       toast.error('No active chat found');
-      return false;
+      return undefined;
     }
 
     try {
@@ -200,12 +200,14 @@ export function useNetlifyDeploy() {
       // Show success toast notification
       toast.success(`🚀 Netlify deployment completed successfully!`);
 
-      return true;
+      // Return the live URL so callers (e.g. the Publish sheet) can show it directly instead of
+      // re-deriving it from account stats — which aren't available for operator-default deploys.
+      return data.deploy.url as string;
     } catch (error) {
       console.error('Deploy error:', error);
       toast.error(error instanceof Error ? error.message : 'Deployment failed');
 
-      return false;
+      return undefined;
     } finally {
       setIsDeploying(false);
     }
