@@ -1,7 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
-import { usePreviewStore } from '~/lib/stores/previews';
 import { openShareSheet } from '~/lib/stores/sheets';
 import { classNames } from '~/utils/classNames';
 
@@ -11,7 +10,6 @@ import { classNames } from '~/utils/classNames';
  * the preview and opens the Share sheet.
  */
 export function PreviewBar() {
-  const previewStore = usePreviewStore();
   const previews = useStore(workbenchStore.previews);
   const hasPreview = previews.length > 0;
 
@@ -44,7 +42,7 @@ export function PreviewBar() {
       <div className="pointer-events-auto flex items-center gap-2.5">
         <button
           type="button"
-          onClick={() => previewStore.refreshAllPreviews()}
+          onClick={() => workbenchStore.previewsStore.refreshAllPreviews()}
           disabled={!hasPreview}
           aria-label="Reload preview"
           className={classNames(roundButton, { 'opacity-50 cursor-not-allowed': !hasPreview })}

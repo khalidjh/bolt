@@ -20,11 +20,11 @@ import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import { PreviewBar } from './PreviewBar';
 import { DevServerLogs } from './DevServerLogs';
+import { HeadlessBoltTerminal } from './HeadlessBoltTerminal';
 import { ShareSheet } from '~/components/share/ShareSheet';
 import { PublishSheet } from '~/components/share/PublishSheet';
 import useViewport from '~/lib/hooks';
 
-import { usePreviewStore } from '~/lib/stores/previews';
 import type { ElementInfo } from './Inspector';
 import { ExportChatButton } from '~/components/chat/chatExportAndImport/ExportChatButton';
 import { useChatHistory } from '~/lib/persistence';
@@ -324,8 +324,7 @@ export const Workbench = memo(
         .saveCurrentDocument()
         .then(() => {
           // Explicitly refresh all previews after a file save
-          const previewStore = usePreviewStore();
-          previewStore.refreshAllPreviews();
+          workbenchStore.previewsStore.refreshAllPreviews();
         })
         .catch(() => {
           toast.error('Failed to update file content');
@@ -374,10 +373,11 @@ export const Workbench = memo(
                 'left-[100%]': !showWorkbench,
 
                 /*
-                 * Mobile: the header is hidden while the workbench is open, so go near-fullscreen
-                 * and leave room at the bottom for the floating preview bar.
+                 * Mobile: the header is hidden while the workbench is open, so the preview goes
+                 * fully to the top (no gap) and only leaves room at the bottom for the floating
+                 * preview bar.
                  */
-                'top-2 bottom-[4.75rem]': isSmallViewport,
+                'top-0 bottom-[4.75rem]': isSmallViewport,
                 'top-[calc(var(--header-height)+0.5rem)] bottom-6': !isSmallViewport,
               },
             )}
@@ -392,11 +392,17 @@ export const Workbench = memo(
                     While the dev server is still booting (no preview yet) show its logs instead of a
                     blank wait, so install progress and errors are visible. */}
                 {isSmallViewport ? (
-                  hasPreview ? (
-                    <Preview setSelectedElement={setSelectedElement} hideToolbar />
-                  ) : (
-                    <DevServerLogs />
-                  )
+                  <>
+                    {/* Mobile never mounts the editor/terminal panel, so attach a headless bolt
+                        terminal here — otherwise the shell never initializes and the first
+                        "npm install && npm run dev" action spins forever. */}
+                    <HeadlessBoltTerminal />
+                    {hasPreview ? (
+                      <Preview setSelectedElement={setSelectedElement} hideToolbar />
+                    ) : (
+                      <DevServerLogs />
+                    )}
+                  </>
                 ) : (
                   <>
                     {/* The view switcher now lives in the top header bar; the panel only keeps the

@@ -88,6 +88,10 @@ export class WorkbenchStore {
     return this.#previewsStore.previews;
   }
 
+  get previewsStore() {
+    return this.#previewsStore;
+  }
+
   get files() {
     return this.#filesStore.files;
   }

@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { Slider, type SliderOptions } from '~/components/ui/Slider';
 import { workbenchStore, type WorkbenchViewType } from '~/lib/stores/workbench';
-import { usePreviewStore, previewDeviceModeStore } from '~/lib/stores/previews';
+import { previewDeviceModeStore } from '~/lib/stores/previews';
 import { classNames } from '~/utils/classNames';
 
 const sliderOptions: SliderOptions<WorkbenchViewType> = {
@@ -46,7 +46,6 @@ export function WorkbenchControls() {
   const showWorkbench = useStore(workbenchStore.showWorkbench);
   const previews = useStore(workbenchStore.previews);
   const isDeviceMode = useStore(previewDeviceModeStore);
-  const previewStore = usePreviewStore();
 
   if (!showWorkbench) {
     return null;
@@ -59,7 +58,7 @@ export function WorkbenchControls() {
       <button
         className={iconButton}
         disabled={!hasPreview}
-        onClick={() => previewStore.refreshAllPreviews()}
+        onClick={() => workbenchStore.previewsStore.refreshAllPreviews()}
         title="Reload preview"
         aria-label="Reload preview"
       >

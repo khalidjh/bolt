@@ -909,7 +909,13 @@ export const Preview = memo(({ setSelectedElement, hideToolbar = false }: Previe
       </div>
       )}
 
-      <div className="flex-1 border-t border-bolt-elements-borderColor flex justify-center items-center overflow-auto">
+      <div
+        className={classNames('flex-1 flex justify-center items-center overflow-auto', {
+          // The border-top only makes sense as a separator under the toolbar; with the toolbar
+          // hidden (mobile preview) it just adds a stray line above the site.
+          'border-t border-bolt-elements-borderColor': !hideToolbar,
+        })}
+      >
         <div
           style={{
             width: isDeviceModeOn ? (showDeviceFrameInPreview ? '100%' : `${widthPercent}%`) : '100%',

@@ -34,6 +34,16 @@ export const Artifact = memo(({ artifactId }: ArtifactProps) => {
   const artifacts = useStore(workbenchStore.artifacts);
   const artifact = artifacts[artifactId];
 
+  const previews = useStore(workbenchStore.previews);
+  const hasPreview = previews.length > 0;
+
+  // Jump straight to the running preview (Lovable-style). On mobile the workbench renders the
+  // preview fullscreen as soon as it's shown; on desktop we also switch the view to 'preview'.
+  const openPreview = () => {
+    workbenchStore.currentView.set('preview');
+    workbenchStore.showWorkbench.set(true);
+  };
+
   const actions = useStore(
     computed(artifact.runner.actions, (actions) => {
       // Filter out Supabase actions except for migrations
@@ -152,6 +162,15 @@ export const Artifact = memo(({ artifactId }: ArtifactProps) => {
             </motion.div>
           )}
         </AnimatePresence>
+        {hasPreview && (
+          <button
+            onClick={openPreview}
+            className="flex items-center justify-center gap-1.5 w-full px-5 py-3 text-sm font-medium border-t border-bolt-elements-borderColor bg-bolt-elements-artifacts-background hover:bg-bolt-elements-artifacts-backgroundHover text-bolt-elements-item-contentAccent transition-colors"
+          >
+            <span className="i-ph:eye text-base" />
+            Preview
+          </button>
+        )}
       </div>
     </>
   );

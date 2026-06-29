@@ -6,19 +6,15 @@ import { classNames } from '~/utils/classNames';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { WorkbenchControls, WorkbenchViewSlider } from './WorkbenchControls.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
-import { description as descriptionStore, chatTimestamp } from '~/lib/persistence';
+import { description as descriptionStore } from '~/lib/persistence';
 import { sidebarOpenStore, toggleSidebar } from '~/lib/stores/sidebar';
 import { workbenchStore } from '~/lib/stores/workbench';
-import { formatRelativeTime } from '~/utils/formatRelativeTime';
 
 export function Header() {
   const chat = useStore(chatStore);
   const sidebarOpen = useStore(sidebarOpenStore);
   const chatDescription = useStore(descriptionStore);
-  const timestamp = useStore(chatTimestamp);
   const showWorkbench = useStore(workbenchStore.showWorkbench);
-
-  const subtitle = formatRelativeTime(timestamp);
 
   // Reflect chat-started on the root element so CSS can give the pre-chat homepage a taller header
   // (keeps the centered logo off the top). Drives --header-height for both this header and the
@@ -79,7 +75,6 @@ export function Header() {
             <img src="/etlaq-mark.svg" alt="" aria-hidden className="w-6 h-6 shrink-0" />
             <div className="flex flex-col leading-tight">
               <ClientOnly>{() => <ChatDescription variant="bare" align="start" />}</ClientOnly>
-              {subtitle && <span className="text-[11px] text-bolt-elements-textTertiary whitespace-nowrap">{subtitle}</span>}
             </div>
           </div>
         )}
@@ -89,9 +84,6 @@ export function Header() {
       {chat.started && chatDescription && !sidebarOpen && (
         <div className="lg:hidden flex-1 flex flex-col items-center justify-center min-w-0 px-2 leading-tight">
           <ClientOnly>{() => <ChatDescription />}</ClientOnly>
-          {subtitle && (
-            <span className="mt-0.5 text-[11px] text-bolt-elements-textTertiary truncate max-w-full">{subtitle}</span>
-          )}
         </div>
       )}
 
