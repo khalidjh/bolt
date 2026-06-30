@@ -121,6 +121,13 @@ export class BoltShell {
    */
   #devProcess: WebContainerProcess | undefined;
 
+  /*
+   * Serializes commands run through executeCommand on the shared interactive shell. Each invocation
+   * chains onto the previous one so a later command never preempts (Ctrl-C's) an earlier one that is
+   * still running. See executeCommand for why this matters.
+   */
+  #commandChain: Promise<unknown> = Promise.resolve();
+
   constructor() {
     this.#readyPromise = new Promise((resolve) => {
       this.#initialized = resolve;
@@ -234,31 +241,45 @@ export class BoltShell {
   }
 
   async executeCommand(sessionId: string, command: string, abort?: () => void): Promise<ExecutionResult> {
+    /*
+     * Serialize every command on this shared interactive shell. The action shell is shared across all
+     * artifacts/runners, so without this a second executeCommand (e.g. the dev-server dependency
+     * install in #ensureDependenciesInstalled) could run while an earlier command (e.g. the restore
+     * setup `npm install`) was still in flight. The previous logic preempted on entry — it called
+     * state.abort() and fired an unconditional Ctrl-C — which KILLED that running install, leaving
+     * node_modules half-written so `npm run dev` then failed with "Failed To Start Application".
+     * Chaining each invocation onto the previous one makes commands run one-at-a-time instead of
+     * interrupting each other. The dev server is exempt: it runs as its own detached process
+     * (startDevServer), never through here, so serializing here can't wedge on a never-exiting server.
+     */
+    const result = this.#commandChain.then(() => this.#runCommand(sessionId, command, abort));
+
+    // Keep the chain alive even if a command throws/rejects, so one failure can't wedge the shell.
+    this.#commandChain = result.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return result;
+  }
+
+  async #runCommand(sessionId: string, command: string, abort?: () => void): Promise<ExecutionResult> {
     if (!this.process || !this.terminal) {
       return undefined;
     }
 
-    const state = this.executionState.get();
-
-    if (state?.active && state.abort) {
-      state.abort();
-    }
-
     /*
-     * interrupt the current execution
-     *  this.#shellInputStream?.write('\x03');
+     * Clear any partial input and sync to a fresh prompt before sending the command. Commands are
+     * serialized by executeCommand, so nothing is running here — this Ctrl-C just resets the line
+     * rather than interrupting a live command.
      */
     this.terminal.input('\x03');
     await this.waitTillOscCode('prompt');
 
-    if (state && state.executionPrms) {
-      await state.executionPrms;
-    }
-
-    //start a new execution
+    // start a new execution
     this.terminal.input(command.trim() + '\n');
 
-    //wait for the execution to finish
+    // wait for the execution to finish
     const executionPromise = this.getCurrentExecutionResult();
     this.executionState.set({ sessionId, active: true, executionPrms: executionPromise, abort });
 
