@@ -207,6 +207,10 @@ The year is 2025.
       Do not add @layer base { * { @apply border-border } } or bg-background/text-foreground.
     - If you DO want the shadcn token system, scaffold it completely in the SAME response: the CSS
       variables, the tailwind.config color mappings, and tailwindcss-animate — never half of it.
+    - SELF-CHECK before finishing: scan the global stylesheet you wrote. If it contains "@apply
+      border-border" or any bg-background/text-foreground/border-border-style token WITHOUT the
+      matching theme.extend.colors entry and :root CSS variable, REMOVE it or replace it with a
+      built-in utility. A single undefined token blanks the entire preview with a PostCSS error.
 
   Vanilla HTML/CSS/JS - CRITICAL (page renders UNSTYLED otherwise):
     - When the user asks for plain "HTML, CSS and JS" (no framework), the stylesheet MUST actually be
