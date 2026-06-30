@@ -13,8 +13,6 @@ const ControlPanel = lazy(() =>
 );
 import { SettingsButton, HelpButton } from '~/components/ui/SettingsButton';
 import { Button } from '~/components/ui/Button';
-import { ImportButtons } from '~/components/chat/chatExportAndImport/ImportButtons';
-import GitCloneButton from '~/components/chat/GitCloneButton';
 import { db, deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory } from '~/lib/persistence';
 import { cubicEasingFn } from '~/utils/easings';
 import { HistoryItem } from './HistoryItem';
@@ -404,11 +402,6 @@ export const Menu = () => {
                 aria-label="Search chats"
               />
             </div>
-          </div>
-          {/* Import / clone actions — shown only on mobile, where the landing-page button row is hidden */}
-          <div className="sm:hidden px-4 pb-3 flex flex-col items-stretch gap-2 border-b border-gray-200 dark:border-gray-800 mb-1">
-            <ImportButtons importChat={importChat} />
-            <GitCloneButton importChat={importChat} className="w-full" />
           </div>
           {/* Deploy + debug actions — the header hides these below `lg` to stay uncluttered, so surface
               them here on smaller screens. Only shown once a preview exists (i.e. a project is running). */}
