@@ -19,6 +19,7 @@ import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
 import { detectProjectCommands } from '~/utils/projectCommands';
 import type { ActionAlert, DeployAlert, SupabaseAlert } from '~/types/actions';
+import { workbenchBusyState } from './streaming';
 
 const { saveAs } = fileSaver;
 
@@ -58,6 +59,7 @@ export class WorkbenchStore {
   modifiedFiles = new Set<string>();
   artifactIdList: string[] = [];
   #globalExecutionQueue = Promise.resolve();
+  #pendingExecutionCount = 0;
   constructor() {
     if (import.meta.hot) {
       import.meta.hot.data.artifacts = this.artifacts;
@@ -81,7 +83,25 @@ export class WorkbenchStore {
   }
 
   addToExecutionQueue(callback: () => Promise<void>) {
-    this.#globalExecutionQueue = this.#globalExecutionQueue.then(() => callback());
+    /*
+     * Track in-flight queued work so workbenchBusyState reflects "files are still being written",
+     * even after the chat text has finished streaming. A stale-chunk reload waits on this so it
+     * can't interrupt the file-writing tail (see entry.client.tsx).
+     */
+    this.#pendingExecutionCount++;
+    workbenchBusyState.set(true);
+
+    this.#globalExecutionQueue = this.#globalExecutionQueue.then(async () => {
+      try {
+        await callback();
+      } finally {
+        this.#pendingExecutionCount = Math.max(0, this.#pendingExecutionCount - 1);
+
+        if (this.#pendingExecutionCount === 0) {
+          workbenchBusyState.set(false);
+        }
+      }
+    });
   }
 
   get previews() {
@@ -629,10 +649,12 @@ export class WorkbenchStore {
       return;
     }
 
-    // Bail if ANY artifact already emitted a start action or a dev-server shell command — let it run.
-    // A response often has more than one artifact (e.g. a bundled "Initial files" artifact plus the
-    // main one), and the start action may live in a later artifact, so we must scan them all — not
-    // just the first — or we'd double-start the dev server.
+    /*
+     * Bail if ANY artifact already emitted a start action or a dev-server shell command — let it run.
+     * A response often has more than one artifact (e.g. a bundled "Initial files" artifact plus the
+     * main one), and the start action may live in a later artifact, so we must scan them all — not
+     * just the first — or we'd double-start the dev server.
+     */
     const devCommand =
       /(^|&&|;|\|)\s*(npm run dev|npm start|npm run start|yarn dev|yarn start|pnpm (run )?dev|pnpm start|bun (run )?dev|vite|next dev|remix vite:dev|astro dev|nuxt dev|ng serve|expo start)\b/i;
     const alreadyHasDevAction = Object.values(this.artifacts.get()).some((candidate) =>

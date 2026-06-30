@@ -1,7 +1,7 @@
 import { RemixBrowser } from '@remix-run/react';
 import { startTransition } from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import { streamingState } from '~/lib/stores/streaming';
+import { streamingState, workbenchBusyState } from '~/lib/stores/streaming';
 
 /**
  * After a redeploy, asset hashes change. A browser still running the previous
@@ -68,14 +68,25 @@ function performStaleChunkReload() {
 
 let reloadDeferred = false;
 
+/*
+ * A generation is "in progress" while the assistant is streaming text (streamingState) OR while the
+ * workbench is still draining queued file/shell actions (workbenchBusyState). The action queue runs
+ * asynchronously behind the stream, so files keep being written for a moment AFTER the text stops —
+ * reloading in that window leaves the last action (e.g. the final component) stuck on a spinner.
+ */
+function isGenerationInProgress() {
+  return streamingState.get() || workbenchBusyState.get();
+}
+
 /**
  * A stale lazy chunk (e.g. the code editor / terminal) commonly fails to load the moment the
  * workbench mounts — which is exactly while the assistant is streaming code. A full-page reload
  * there throws away the in-progress generation and drops the user into a snapshot restore. So if a
- * generation is actively streaming, defer the reload until it finishes; otherwise reload right away.
+ * generation is in progress, defer the reload until it finishes (text streamed AND files written);
+ * otherwise reload right away.
  */
 function handleStaleChunkError() {
-  if (!streamingState.get()) {
+  if (!isGenerationInProgress()) {
     performStaleChunkReload();
     return;
   }
@@ -86,12 +97,19 @@ function handleStaleChunkError() {
 
   reloadDeferred = true;
 
-  const unsubscribe = streamingState.listen((streaming) => {
-    if (!streaming) {
-      unsubscribe();
-      performStaleChunkReload();
+  const tryReload = () => {
+    if (isGenerationInProgress()) {
+      return;
     }
-  });
+
+    unsubStreaming();
+    unsubBusy();
+    performStaleChunkReload();
+  };
+
+  // Wait for BOTH signals to settle: streaming ends first, then the action queue drains.
+  const unsubStreaming = streamingState.listen(tryReload);
+  const unsubBusy = workbenchBusyState.listen(tryReload);
 }
 
 // Vite dispatches this when a dynamic import / module preload fails to load.
