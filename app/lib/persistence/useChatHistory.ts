@@ -133,6 +133,7 @@ export function useChatHistory() {
                   // Combine followup message and the artifact with files and command actions
                   content: `Etlaq Restored your chat from a snapshot. You can revert this message to load the full chat history.
                   <boltArtifact id="restored-project-setup" title="Restored Project & Setup" type="bundled">
+                  ${commandActionsString}
                   ${Object.entries(snapshot?.files || {})
                     .map(([key, value]) => {
                       if (value?.type === 'file') {
@@ -146,9 +147,17 @@ ${value.content}
                       }
                     })
                     .join('\n')}
-                  ${commandActionsString} 
                   </boltArtifact>
-                  `, // Added commandActionsString, followupMessage, updated id and title
+                  `,
+
+                  /*
+                   * The install/dev command actions are emitted FIRST, before the file actions. The
+                   * parser ends a file action at the first `</boltAction>` (or `</boltArtifact>`) it
+                   * sees, so a restored file whose content contains a stray bolt tag truncates the
+                   * artifact — which previously dropped the trailing commands, so the dev server never
+                   * started and the preview stayed blank. With the commands up front they always parse
+                   * and run; the files themselves are restored reliably via restoreSnapshot below.
+                   */
                   annotations: [
                     'no-store',
                     ...(summary
@@ -171,7 +180,19 @@ ${value.content}
                  */
                 ...filteredMessages,
               ];
-              await restoreSnapshot(mixedId, validSnapshot);
+
+              /*
+               * Write the snapshot files directly into the WebContainer. This is the reliable,
+               * parse-immune source of truth for the project files. A failure here (e.g. the
+               * WebContainer failing to boot) must not abort the load and leave a blank chat —
+               * surface it and still render the conversation.
+               */
+              try {
+                await restoreSnapshot(mixedId, validSnapshot);
+              } catch (snapshotError) {
+                console.error('Failed to restore project files from snapshot:', snapshotError);
+                toast.error('Could not restore project files from the snapshot.');
+              }
             }
 
             setInitialMessages(filteredMessages);
