@@ -24,7 +24,14 @@ if (!import.meta.env.SSR) {
     Promise.resolve()
       .then(() => {
         return WebContainer.boot({
-          coep: 'credentialless',
+          /*
+           * Must match the COEP header the document is served with (see entry.server.tsx:
+           * `Cross-Origin-Embedder-Policy: require-corp`). Safari does not support the
+           * `credentialless` COEP mode, so booting with it there hangs forever — leaving the
+           * "Creating initial files" spinner stuck. `require-corp` is supported across Chrome,
+           * Firefox and Safari 16.4+.
+           */
+          coep: 'require-corp',
           workdirName: WORK_DIR_NAME,
           forwardPreviewErrors: true, // Enable error forwarding from iframes
         });
@@ -57,6 +64,31 @@ if (!import.meta.env.SSR) {
         });
 
         return webcontainer;
+      })
+      .catch((error) => {
+        /*
+         * A boot failure (e.g. an unsupported browser, blocked SharedArrayBuffer, or a missing
+         * cross-origin-isolation header) must not be swallowed: without this the promise rejects
+         * silently and every `await webcontainer` downstream hangs, leaving spinners stuck forever.
+         * Surface it so the failure is visible instead of an eternal "Creating initial files".
+         */
+        console.error('WebContainer failed to boot:', error);
+
+        import('~/lib/stores/workbench')
+          .then(({ workbenchStore }) => {
+            workbenchStore.actionAlert.set({
+              type: 'preview',
+              title: 'Preview environment unavailable',
+              description: 'The in-browser runtime could not start.',
+              content: `WebContainer failed to boot. This usually means the browser doesn't support the required cross-origin isolation, or an extension is blocking it.\n\n${
+                error instanceof Error ? error.message : String(error)
+              }`,
+              source: 'preview',
+            });
+          })
+          .catch(() => {});
+
+        throw error;
       });
 
   if (import.meta.hot) {
